@@ -1,134 +1,74 @@
 # backend/runner.py
-# Bridges the FastAPI layer with the agent modules
 
 import os
-import base64
 import json
 import asyncio
-from dotenv import dotenv_values
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request as GoogleRequest
 
-ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/calendar.readonly",
+]
 
+def build_google_creds(token_data: dict) -> Credentials:
+    creds = Credentials(
+        token=token_data.get("access_token"),
+        refresh_token=token_data.get("refresh_token"),
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=SCOPES,
+    )
+    if creds.expired and creds.refresh_token:
+        creds.refresh(GoogleRequest())
+    return creds
 
-# ==============================
-# SAVE CONFIG TO .ENV
-# ==============================
-
-def save_config(config: dict, keys: dict):
-    existing = dotenv_values(ENV_PATH) if os.path.exists(ENV_PATH) else {}
-
-    updates = {
-        "LLM":            config.get("llm", ""),
-        "CALENDAR":       config.get("calendar", ""),
-        "CRM":            config.get("crm", ""),
-        "EMAIL_DELIVERY": config.get("email_delivery", ""),
-    }
-
-    key_map = {
-        "openai_api_key":           "OPENAI_API_KEY",
-        "anthropic_api_key":        "ANTHROPIC_API_KEY",
-        "zoho_client_id":           "ZOHO_CLIENT_ID",
-        "zoho_client_secret":       "ZOHO_CLIENT_SECRET",
-        "zoho_refresh_token":       "ZOHO_REFRESH_TOKEN",
-        "zoho_region":              "ZOHO_REGION",
-        "hubspot_api_key":          "HUBSPOT_API_KEY",
-        "salesforce_username":      "SALESFORCE_USERNAME",
-        "salesforce_password":      "SALESFORCE_PASSWORD",
-        "salesforce_security_token":"SALESFORCE_SECURITY_TOKEN",
-        "outlook_client_id":        "OUTLOOK_CLIENT_ID",
-        "outlook_client_secret":    "OUTLOOK_CLIENT_SECRET",
-        "outlook_tenant_id":        "OUTLOOK_TENANT_ID",
-        "founder_email":            "FOUNDER_EMAIL",
-        "sender_email":             "SENDER_EMAIL",
-        "smtp_host":                "SMTP_HOST",
-        "smtp_port":                "SMTP_PORT",
-        "smtp_username":            "SMTP_USERNAME",
-        "smtp_password":            "SMTP_PASSWORD",
-    }
-
-    for py_key, env_key in key_map.items():
-        val = keys.get(py_key)
-        if val:
-            updates[env_key] = val
-
-    # Write Google credentials.json if provided
-    if keys.get("google_credentials_json"):
-        creds_path = os.path.join(os.path.dirname(__file__), "credentials.json")
-        decoded = base64.b64decode(keys["google_credentials_json"])
-        with open(creds_path, "wb") as f:
-            f.write(decoded)
-        updates["GOOGLE_CREDENTIALS_FILE"] = "credentials.json"
-        updates["GOOGLE_TOKEN_FILE"]        = "token.json"
-
-    merged = {**existing, **updates}
-    with open(ENV_PATH, "w") as f:
-        for k, v in merged.items():
-            f.write(f"{k}={v}\n")
-
-    # Reload into os.environ immediately
-    for k, v in merged.items():
-        os.environ[k] = v
+def get_zoho_access_token(zoho_tokens: dict) -> str:
+    import requests
+    region = os.getenv("ZOHO_REGION", "in")
+    resp = requests.post(
+        f"https://accounts.zoho.{region}/oauth/v2/token",
+        params={
+            "grant_type":    "refresh_token",
+            "client_id":     os.getenv("ZOHO_CLIENT_ID"),
+            "client_secret": os.getenv("ZOHO_CLIENT_SECRET"),
+            "refresh_token": zoho_tokens.get("refresh_token"),
+        }
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    token = data.get("access_token")
+    if not token:
+        raise RuntimeError(f"Zoho token refresh failed: {data}")
+    return token
 
 
-# ==============================
-# INJECT KEYS INTO ENV
-# ==============================
+async def run_agent(user: dict):
+    llm           = user.get("llm", "openai")
+    crm           = user.get("crm", "zoho")
+    founder_email = user.get("founder_email", "")
+    openai_key    = user.get("openai_api_key", "")
+    anthropic_key = user.get("anthropic_api_key", "")
 
-def inject_keys(config: dict, keys: dict):
-    """Set env vars for this request without writing to disk"""
-    os.environ["LLM"]            = config.get("llm", "")
-    os.environ["CALENDAR"]       = config.get("calendar", "")
-    os.environ["CRM"]            = config.get("crm", "")
-    os.environ["EMAIL_DELIVERY"] = config.get("email_delivery", "")
-
-    key_map = {
-        "openai_api_key":           "OPENAI_API_KEY",
-        "anthropic_api_key":        "ANTHROPIC_API_KEY",
-        "zoho_client_id":           "ZOHO_CLIENT_ID",
-        "zoho_client_secret":       "ZOHO_CLIENT_SECRET",
-        "zoho_refresh_token":       "ZOHO_REFRESH_TOKEN",
-        "zoho_region":              "ZOHO_REGION",
-        "hubspot_api_key":          "HUBSPOT_API_KEY",
-        "founder_email":            "FOUNDER_EMAIL",
-        "sender_email":             "SENDER_EMAIL",
-        "outlook_client_id":        "OUTLOOK_CLIENT_ID",
-        "outlook_client_secret":    "OUTLOOK_CLIENT_SECRET",
-        "outlook_tenant_id":        "OUTLOOK_TENANT_ID",
-        "smtp_host":                "SMTP_HOST",
-        "smtp_port":                "SMTP_PORT",
-        "smtp_username":            "SMTP_USERNAME",
-        "smtp_password":            "SMTP_PASSWORD",
-    }
-    for py_key, env_key in key_map.items():
-        val = keys.get(py_key)
-        if val:
-            os.environ[env_key] = val
-
-
-# ==============================
-# AGENT RUNNER (async generator)
-# ==============================
-
-async def run_agent(config: dict, keys: dict):
-    inject_keys(config, keys)
-
-    llm      = config["llm"]
-    calendar = config["calendar"]
-    crm      = config["crm"]
+    # Inject keys into env for modules
+    if openai_key:    os.environ["OPENAI_API_KEY"]    = openai_key
+    if anthropic_key: os.environ["ANTHROPIC_API_KEY"] = anthropic_key
+    os.environ["FOUNDER_EMAIL"] = founder_email
+    os.environ["SENDER_EMAIL"]  = user.get("email", "")
 
     data = {}
-    creds = None
 
     # --- Google Auth ---
-    if calendar == "google":
-        yield {"type": "progress", "message": "Authenticating with Google..."}
-        await asyncio.sleep(0)
-        try:
-            from modules.calendar.google_cal import get_google_creds
-            creds = get_google_creds()
-        except Exception as e:
-            yield {"type": "error", "message": f"Google auth failed: {e}"}
-            return
+    yield {"type": "progress", "message": "Authenticating with Google..."}
+    await asyncio.sleep(0)
+    try:
+        google_tokens = json.loads(user.get("google_tokens", "{}"))
+        creds = build_google_creds(google_tokens)
+    except Exception as e:
+        yield {"type": "error", "message": f"Google auth failed: {e}"}
+        return
 
     # --- Gmail ---
     yield {"type": "progress", "message": "Fetching Gmail..."}
@@ -143,15 +83,11 @@ async def run_agent(config: dict, keys: dict):
         data["gmail_snippets"] = []
 
     # --- Calendar ---
-    yield {"type": "progress", "message": f"Fetching {calendar.title()} Calendar..."}
+    yield {"type": "progress", "message": "Fetching Google Calendar..."}
     await asyncio.sleep(0)
     try:
-        if calendar == "google":
-            from modules.calendar.google_cal import fetch_calendar
-            cal_data = fetch_calendar(creds)
-        else:
-            from modules.calendar.outlook_cal import fetch_calendar
-            cal_data = fetch_calendar()
+        from modules.calendar.google_cal import fetch_calendar
+        cal_data = fetch_calendar(creds)
         data["calendar_events"] = cal_data
         yield {"type": "progress", "message": f"Calendar: {len(cal_data)} events"}
     except Exception as e:
@@ -159,23 +95,29 @@ async def run_agent(config: dict, keys: dict):
         data["calendar_events"] = []
 
     # --- CRM ---
-    if crm != "none":
-        yield {"type": "progress", "message": f"Fetching {crm.title()} CRM..."}
+    if crm == "zoho":
+        yield {"type": "progress", "message": "Fetching Zoho CRM..."}
         await asyncio.sleep(0)
         try:
-            if crm == "zoho":
-                from modules.crm.zoho import fetch_crm
-            elif crm == "hubspot":
-                from modules.crm.hubspot import fetch_crm
-            elif crm == "salesforce":
-                from modules.crm.salesforce import fetch_crm
-            elif crm == "pipedrive":
-                from modules.crm.pipedrive import fetch_crm
+            zoho_tokens = json.loads(user.get("zoho_tokens", "{}"))
+            access_token = get_zoho_access_token(zoho_tokens)
+            os.environ["ZOHO_ACCESS_TOKEN"] = access_token
+            from modules.crm.zoho import fetch_crm
             crm_data = fetch_crm()
             data["crm"] = crm_data
-            yield {"type": "progress", "message": f"CRM: data fetched"}
+            yield {"type": "progress", "message": "Zoho CRM: data fetched"}
         except Exception as e:
-            yield {"type": "warning", "message": f"CRM skipped: {e}"}
+            yield {"type": "warning", "message": f"Zoho skipped: {e}"}
+            data["crm"] = {}
+    elif crm == "hubspot":
+        yield {"type": "progress", "message": "Fetching HubSpot CRM..."}
+        await asyncio.sleep(0)
+        try:
+            from modules.crm.hubspot import fetch_crm
+            data["crm"] = fetch_crm()
+            yield {"type": "progress", "message": "HubSpot CRM: data fetched"}
+        except Exception as e:
+            yield {"type": "warning", "message": f"HubSpot skipped: {e}"}
             data["crm"] = {}
 
     # --- Generate Report ---
@@ -192,20 +134,12 @@ async def run_agent(config: dict, keys: dict):
         return
 
     # --- Send Email ---
-    yield {"type": "progress", "message": "Sending report via email..."}
+    yield {"type": "progress", "message": "Sending report via Gmail..."}
     await asyncio.sleep(0)
     try:
-        email_delivery = config["email_delivery"]
-        if email_delivery == "gmail":
-            from modules.email.gmail_email import send_email
-            send_email(report, creds=creds)
-        elif email_delivery == "outlook":
-            from modules.email.outlook_email import send_email
-            send_email(report)
-        else:
-            from modules.email.smtp_email import send_email
-            send_email(report)
-        yield {"type": "progress", "message": f"Report emailed to {os.getenv('FOUNDER_EMAIL')} ✅"}
+        from modules.email.gmail_email import send_email
+        send_email(report, creds=creds)
+        yield {"type": "progress", "message": f"Report emailed to {founder_email} ✅"}
     except Exception as e:
         yield {"type": "warning", "message": f"Email failed: {e}"}
 
