@@ -52,7 +52,11 @@ def get_session_email(request: Request) -> str | None:
 def set_session(response: Response, email: str):
     response.set_cookie(
         "session_email", email,
-        httponly=True, samesite="none", secure=True, max_age=60*60*24*30
+        httponly=True,
+        samesite="lax",
+        secure=True,
+        max_age=60*60*24*30,
+        domain=None
     )
 
 
