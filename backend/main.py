@@ -66,7 +66,7 @@ def set_session(response: Response, email: str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "2"}
 
 @app.get("/debug")
 def debug():
@@ -174,10 +174,10 @@ async def zoho_callback(code: str, state: str):
     save_user(email, user)
 
     import urllib.parse
+    encoded_email = urllib.parse.quote(email)
     html = f"""
     <html><body><script>
-      localStorage.setItem('session_email', '{email}');
-      window.location.href = '{FRONTEND_URL}?connected=zoho';
+      window.location.replace('{FRONTEND_URL}?connected=zoho&session={encoded_email}');
     </script></body></html>
     """
     return HTMLResponse(content=html)
