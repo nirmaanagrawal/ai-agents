@@ -5,7 +5,7 @@ import json
 import secrets
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
@@ -173,10 +173,14 @@ async def zoho_callback(code: str, state: str):
     user["zoho_tokens"] = json.dumps(tokens)
     save_user(email, user)
 
-    redirect_url = f"{FRONTEND_URL}?connected=zoho&session={urllib.parse.quote(email)}"
-    response = RedirectResponse(url=redirect_url, status_code=302)
-    set_session(response, email)
-    return response
+    import urllib.parse
+    html = f"""
+    <html><body><script>
+      localStorage.setItem('session_email', '{email}');
+      window.location.href = '{FRONTEND_URL}?connected=zoho';
+    </script></body></html>
+    """
+    return HTMLResponse(content=html)
 
 
 # ==============================
