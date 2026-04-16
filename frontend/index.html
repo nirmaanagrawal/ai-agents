@@ -220,7 +220,8 @@
     btn.className = "connect-btn idle";
     btn.textContent = meta.oauth ? "Connect" : "Not needed";
     if (!meta.oauth) {
-      btn.className = "connect-btn connected";
+      btn.className   = "connect-btn connected";
+      btn.textContent = "Use API Key ↓";
     }
 
     // Show relevant key fields
