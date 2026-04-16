@@ -154,6 +154,7 @@ def zoho_auth(request: Request):
 
 @app.get("/auth/zoho/callback")
 async def zoho_callback(code: str, state: str):
+    import urllib.parse
     email = state
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
@@ -172,7 +173,8 @@ async def zoho_callback(code: str, state: str):
     user["zoho_tokens"] = json.dumps(tokens)
     save_user(email, user)
 
-    response = RedirectResponse(f"{FRONTEND_URL}?connected=zoho")
+    redirect_url = f"{FRONTEND_URL}?connected=zoho&session={urllib.parse.quote(email)}"
+    response = RedirectResponse(url=redirect_url, status_code=302)
     set_session(response, email)
     return response
 
