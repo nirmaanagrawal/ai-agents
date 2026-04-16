@@ -178,12 +178,18 @@ async def zoho_callback(code: str, state: str):
 # ==============================
 
 class Settings(BaseModel):
-    openai_api_key: str | None  = None
-    anthropic_api_key: str | None = None
-    llm: str                    = "openai"
-    crm: str                    = "zoho"
+    openai_api_key: str | None        = None
+    anthropic_api_key: str | None     = None
+    llm: str                          = "openai"
+    crm: str                          = "zoho"
     founder_email: str
-    zoho_region: str            = "in"
+    zoho_region: str                  = "in"
+    hubspot_api_key: str | None       = None
+    salesforce_username: str | None   = None
+    salesforce_password: str | None   = None
+    salesforce_security_token: str | None = None
+    pipedrive_api_token: str | None   = None
+    pipedrive_domain: str | None      = None
 
 @app.post("/settings")
 def save_settings(settings: Settings, request: Request):
