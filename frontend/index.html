@@ -101,22 +101,58 @@
         </div>
         <button class="connect-btn connected" id="googleBtn">✓ Connected</button>
       </div>
-      <div class="connect-row">
+
+      <!-- CRM row — changes based on selection -->
+      <div class="connect-row" id="crmConnectRow">
         <div class="connect-info">
-          <div class="connect-icon zoho">📊</div>
+          <div class="connect-icon zoho" id="crmIcon">📊</div>
           <div>
-            <div class="connect-name">Zoho CRM</div>
-            <div class="connect-sub">Deals, Contacts, Tasks</div>
+            <div class="connect-name" id="crmName">Zoho CRM</div>
+            <div class="connect-sub" id="crmSub">Deals, Contacts, Tasks</div>
           </div>
         </div>
-        <button class="connect-btn idle" id="zohoBtn" onclick="connectZoho()">Connect</button>
+        <button class="connect-btn idle" id="crmBtn" onclick="connectCRM()">Connect</button>
       </div>
     </div>
 
     <!-- SETTINGS -->
     <div class="card">
       <h2>Settings</h2>
-      <label>LLM</label>
+
+      <label>CRM</label>
+      <select id="crm" onchange="onCRMChange()">
+        <option value="zoho">Zoho CRM</option>
+        <option value="hubspot">HubSpot</option>
+        <option value="salesforce">Salesforce</option>
+        <option value="pipedrive">Pipedrive</option>
+        <option value="none">None</option>
+      </select>
+
+      <!-- HubSpot key (OAuth not needed — just API key) -->
+      <div id="hubspot-key-field" style="display:none">
+        <label>HubSpot API Key</label>
+        <input type="password" id="hubspot_api_key" placeholder="pat-..." />
+      </div>
+
+      <!-- Salesforce fields -->
+      <div id="salesforce-fields" style="display:none">
+        <label>Salesforce Username</label>
+        <input type="text" id="salesforce_username" placeholder="user@company.com" />
+        <label>Salesforce Password</label>
+        <input type="password" id="salesforce_password" />
+        <label>Security Token</label>
+        <input type="password" id="salesforce_security_token" />
+      </div>
+
+      <!-- Pipedrive key -->
+      <div id="pipedrive-key-field" style="display:none">
+        <label>Pipedrive API Token</label>
+        <input type="password" id="pipedrive_api_token" placeholder="abc123..." />
+        <label>Company Domain</label>
+        <input type="text" id="pipedrive_domain" placeholder="yourcompany" />
+      </div>
+
+      <label style="margin-top:4px">LLM</label>
       <select id="llm">
         <option value="openai">OpenAI (gpt-4.1)</option>
         <option value="claude">Claude (Anthropic)</option>
@@ -159,6 +195,49 @@
     document.getElementById("claude-key-field").style.display = e.target.value === "claude" ? "" : "none";
   });
 
+  const CRM_META = {
+    zoho:       { name: "Zoho CRM",    sub: "Deals, Contacts, Tasks", icon: "📊", oauth: true },
+    hubspot:    { name: "HubSpot",     sub: "Deals, Contacts",        icon: "🟠", oauth: false },
+    salesforce: { name: "Salesforce",  sub: "Opportunities, Contacts",icon: "☁️", oauth: false },
+    pipedrive:  { name: "Pipedrive",   sub: "Deals, Contacts",        icon: "🔵", oauth: false },
+    none:       { name: "No CRM",      sub: "Skip CRM data",          icon: "➖", oauth: false },
+  };
+
+  function onCRMChange() {
+    const crm  = document.getElementById("crm").value;
+    const meta = CRM_META[crm];
+
+    // Update connect row
+    document.getElementById("crmName").textContent = meta.name;
+    document.getElementById("crmSub").textContent  = meta.sub;
+    document.getElementById("crmIcon").textContent = meta.icon;
+
+    // Show/hide connect button vs key fields
+    const crmRow = document.getElementById("crmConnectRow");
+    crmRow.style.display = crm === "none" ? "none" : "";
+
+    const btn = document.getElementById("crmBtn");
+    btn.className = "connect-btn idle";
+    btn.textContent = meta.oauth ? "Connect" : "Not needed";
+    if (!meta.oauth) {
+      btn.className = "connect-btn connected";
+    }
+
+    // Show relevant key fields
+    document.getElementById("hubspot-key-field").style.display    = crm === "hubspot"    ? "" : "none";
+    document.getElementById("salesforce-fields").style.display    = crm === "salesforce" ? "" : "none";
+    document.getElementById("pipedrive-key-field").style.display  = crm === "pipedrive"  ? "" : "none";
+  }
+
+  function connectCRM() {
+    const crm = document.getElementById("crm").value;
+    if (crm === "zoho") connectZoho();
+  }
+
+  function connectZoho() {
+    window.location.href = `${BACKEND}/auth/zoho`;
+  }
+
   // ---- Check session on load ----
   async function checkStatus() {
     const resp = await fetch(`${BACKEND}/status`, { credentials: "include" });
@@ -177,11 +256,12 @@
     document.getElementById("userEmail").textContent      = s.email;
     if (s.founder_email) document.getElementById("founder_email").value = s.founder_email;
     if (s.llm)           document.getElementById("llm").value           = s.llm;
+    if (s.crm)         { document.getElementById("crm").value           = s.crm; onCRMChange(); }
     if (s.zoho_connected) {
-      const btn = document.getElementById("zohoBtn");
-      btn.textContent  = "✓ Connected";
-      btn.className    = "connect-btn connected";
-      btn.onclick      = null;
+      const btn = document.getElementById("crmBtn");
+      btn.textContent = "✓ Connected";
+      btn.className   = "connect-btn connected";
+      btn.onclick     = null;
     }
   }
 
@@ -202,11 +282,17 @@
   // ---- Settings ----
   async function saveSettings() {
     const payload = {
-      llm:              document.getElementById("llm").value,
-      openai_api_key:   document.getElementById("openai_api_key").value,
-      anthropic_api_key:document.getElementById("anthropic_api_key").value,
-      founder_email:    document.getElementById("founder_email").value,
-      crm:              "zoho",
+      llm:                   document.getElementById("llm").value,
+      crm:                   document.getElementById("crm").value,
+      openai_api_key:        document.getElementById("openai_api_key").value,
+      anthropic_api_key:     document.getElementById("anthropic_api_key").value,
+      hubspot_api_key:       document.getElementById("hubspot_api_key").value,
+      salesforce_username:   document.getElementById("salesforce_username").value,
+      salesforce_password:   document.getElementById("salesforce_password").value,
+      salesforce_security_token: document.getElementById("salesforce_security_token").value,
+      pipedrive_api_token:   document.getElementById("pipedrive_api_token").value,
+      pipedrive_domain:      document.getElementById("pipedrive_domain").value,
+      founder_email:         document.getElementById("founder_email").value,
     };
     const resp = await fetch(`${BACKEND}/settings`, {
       method: "POST", credentials: "include",
