@@ -239,13 +239,25 @@
     window.location.href = `${BACKEND}/auth/zoho`;
   }
 
+  // ---- Session helpers (localStorage instead of cookie) ----
+  function getSession() { return localStorage.getItem("session_email"); }
+  function setSession(email) { localStorage.setItem("session_email", email); }
+  function clearSession() { localStorage.removeItem("session_email"); }
+
   // ---- Check session on load ----
   async function checkStatus() {
-    const resp = await fetch(`${BACKEND}/status`, { credentials: "include" });
+    const email = getSession();
+    if (!email) {
+      document.getElementById("loginSection").style.display = "";
+      document.getElementById("appSection").style.display   = "none";
+      return;
+    }
+    const resp = await fetch(`${BACKEND}/status?email=${encodeURIComponent(email)}`, { credentials: "include" });
     const s = await resp.json();
     if (s.logged_in) {
       showApp(s);
     } else {
+      clearSession();
       document.getElementById("loginSection").style.display = "";
       document.getElementById("appSection").style.display   = "none";
     }
@@ -277,11 +289,13 @@
 
   async function logout() {
     await fetch(`${BACKEND}/logout`, { method: "POST", credentials: "include" });
+    clearSession();
     checkStatus();
   }
 
   // ---- Settings ----
   async function saveSettings() {
+    const email = getSession();
     const payload = {
       llm:                   document.getElementById("llm").value,
       crm:                   document.getElementById("crm").value,
@@ -295,7 +309,7 @@
       pipedrive_domain:      document.getElementById("pipedrive_domain").value,
       founder_email:         document.getElementById("founder_email").value,
     };
-    const resp = await fetch(`${BACKEND}/settings`, {
+    const resp = await fetch(`${BACKEND}/settings?email=${encodeURIComponent(email)}`, {
       method: "POST", credentials: "include",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload)
@@ -306,13 +320,14 @@
 
   // ---- Run ----
   async function runAgent() {
+    const email = getSession();
     const btn = document.getElementById("runBtn");
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Running...';
     document.getElementById("log").innerHTML = "";
     document.getElementById("reportBox").classList.remove("visible");
 
-    const resp = await fetch(`${BACKEND}/run`, {
+    const resp = await fetch(`${BACKEND}/run?email=${encodeURIComponent(email)}`, {
       method: "POST", credentials: "include"
     });
 
@@ -352,7 +367,9 @@
 
   // ---- Handle redirect back from OAuth ----
   const params = new URLSearchParams(window.location.search);
-  if (params.get("connected")) {
+  const sessionEmail = params.get("session");
+  if (sessionEmail) {
+    setSession(decodeURIComponent(sessionEmail));
     window.history.replaceState({}, "", "/");
   }
 
