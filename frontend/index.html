@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weekly Brain</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #0f0f0f; color: #e8e8e8; min-height: 100vh; padding: 40px 20px; }
+    .container { max-width: 780px; margin: 0 auto; }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 36px; }
+
+    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px;
+            padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
+               letter-spacing: 0.08em; color: #666; margin-bottom: 16px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-1 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+    label { font-size: 0.82rem; color: #888; display: block; margin-bottom: 4px; }
+    select, input { width: 100%; background: #111; border: 1px solid #333;
+                    border-radius: 8px; padding: 10px 12px; color: #e8e8e8;
+                    font-size: 0.88rem; outline: none; transition: border 0.2s; }
+    select:focus, input:focus { border-color: #555; }
+    input::placeholder { color: #444; }
+
+    .toggle-keys { background: none; border: none; color: #555; font-size: 0.8rem;
+                   cursor: pointer; padding: 0; margin-bottom: 16px; display: flex;
+                   align-items: center; gap: 6px; }
+    .toggle-keys:hover { color: #888; }
+
+    .keys-section { display: none; }
+    .keys-section.open { display: block; }
+
+    .key-group { margin-bottom: 20px; }
+    .key-group-title { font-size: 0.78rem; color: #555; text-transform: uppercase;
+                       letter-spacing: 0.06em; margin-bottom: 10px; padding-bottom: 6px;
+                       border-bottom: 1px solid #222; }
+
+    .run-btn { width: 100%; padding: 14px; background: #fff; color: #000;
+               border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600;
+               cursor: pointer; transition: opacity 0.2s; margin-top: 8px; }
+    .run-btn:hover { opacity: 0.88; }
+    .run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .save-btn { width: 100%; padding: 11px; background: transparent; color: #888;
+                border: 1px solid #333; border-radius: 10px; font-size: 0.85rem;
+                cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+    .save-btn:hover { border-color: #555; color: #ccc; }
+
+    .log { background: #111; border: 1px solid #222; border-radius: 10px;
+           padding: 16px; min-height: 80px; font-size: 0.82rem; font-family: monospace;
+           color: #666; line-height: 1.7; }
+    .log .info  { color: #888; }
+    .log .warn  { color: #c8a84b; }
+    .log .error { color: #c84b4b; }
+    .log .done  { color: #4bc88a; }
+
+    .report-box { display: none; }
+    .report-box.visible { display: block; }
+    .report-content { background: #111; border: 1px solid #222; border-radius: 10px;
+                      padding: 20px; white-space: pre-wrap; font-size: 0.85rem;
+                      line-height: 1.8; color: #ccc; font-family: monospace; }
+    .copy-btn { margin-top: 10px; padding: 9px 18px; background: #222; border: 1px solid #333;
+                border-radius: 8px; color: #aaa; font-size: 0.82rem; cursor: pointer; }
+    .copy-btn:hover { background: #2a2a2a; }
+
+    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #333;
+               border-top-color: #888; border-radius: 50%; animation: spin 0.7s linear infinite;
+               margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 Weekly Brain</h1>
+  <p class="subtitle">Autonomous startup digest — Gmail · Calendar · CRM → your inbox</p>
+
+  <!-- CONFIG -->
+  <div class="card">
+    <h2>Configuration</h2>
+    <div class="grid-2">
+      <div>
+        <label>LLM</label>
+        <select id="llm">
+          <option value="openai">OpenAI</option>
+          <option value="claude">Claude (Anthropic)</option>
+        </select>
+      </div>
+      <div>
+        <label>Calendar</label>
+        <select id="calendar">
+          <option value="google">Google Calendar</option>
+          <option value="outlook">Outlook</option>
+        </select>
+      </div>
+      <div>
+        <label>CRM</label>
+        <select id="crm">
+          <option value="zoho">Zoho CRM</option>
+          <option value="hubspot">HubSpot</option>
+          <option value="salesforce">Salesforce</option>
+          <option value="pipedrive">Pipedrive</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div>
+        <label>Email Delivery</label>
+        <select id="email_delivery">
+          <option value="gmail">Gmail</option>
+          <option value="outlook">Outlook</option>
+          <option value="smtp">SMTP</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-1" style="margin-top:12px">
+      <div>
+        <label>Founder Email (report recipient)</label>
+        <input type="email" id="founder_email" placeholder="you@yourdomain.com" />
+      </div>
+      <div>
+        <label>Sender Email (must match Gmail/Outlook account)</label>
+        <input type="email" id="sender_email" placeholder="you@gmail.com" />
+      </div>
+    </div>
+  </div>
+
+  <!-- API KEYS -->
+  <div class="card">
+    <h2>API Keys</h2>
+    <button class="toggle-keys" onclick="toggleKeys()">
+      <span id="toggle-icon">▶</span> Show / hide keys
+    </button>
+    <div class="keys-section" id="keysSection">
+
+      <div class="key-group" id="llm-keys">
+        <div class="key-group-title">LLM</div>
+        <div id="openai-keys">
+          <label>OpenAI API Key</label>
+          <input type="password" id="openai_api_key" placeholder="sk-proj-..." />
+        </div>
+        <div id="claude-keys" style="display:none">
+          <label>Anthropic API Key</label>
+          <input type="password" id="anthropic_api_key" placeholder="sk-ant-..." />
+        </div>
+      </div>
+
+      <div class="key-group" id="google-keys">
+        <div class="key-group-title">Google (Gmail + Calendar)</div>
+        <label>credentials.json (paste file contents)</label>
+        <input type="text" id="google_credentials_json" placeholder='{"installed":{"client_id":"..."}}' />
+      </div>
+
+      <div class="key-group" id="outlook-keys" style="display:none">
+        <div class="key-group-title">Microsoft (Outlook Calendar + Email)</div>
+        <div class="grid-2">
+          <div><label>Client ID</label><input type="password" id="outlook_client_id" /></div>
+          <div><label>Client Secret</label><input type="password" id="outlook_client_secret" /></div>
+          <div><label>Tenant ID</label><input type="password" id="outlook_tenant_id" /></div>
+        </div>
+      </div>
+
+      <div class="key-group" id="zoho-keys">
+        <div class="key-group-title">Zoho CRM</div>
+        <div class="grid-2">
+          <div><label>Client ID</label><input type="password" id="zoho_client_id" /></div>
+          <div><label>Client Secret</label><input type="password" id="zoho_client_secret" /></div>
+          <div><label>Refresh Token</label><input type="password" id="zoho_refresh_token" /></div>
+          <div>
+            <label>Region</label>
+            <select id="zoho_region">
+              <option value="in">India (.in)</option>
+              <option value="com">US (.com)</option>
+              <option value="eu">EU (.eu)</option>
+              <option value="au">Australia (.au)</option>
+              <option value="jp">Japan (.jp)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="key-group" id="hubspot-keys" style="display:none">
+        <div class="key-group-title">HubSpot</div>
+        <label>API Key</label>
+        <input type="password" id="hubspot_api_key" placeholder="pat-..." />
+      </div>
+
+      <div class="key-group" id="salesforce-keys" style="display:none">
+        <div class="key-group-title">Salesforce</div>
+        <div class="grid-2">
+          <div><label>Username</label><input type="text" id="salesforce_username" /></div>
+          <div><label>Password</label><input type="password" id="salesforce_password" /></div>
+          <div><label>Security Token</label><input type="password" id="salesforce_security_token" /></div>
+        </div>
+      </div>
+
+      <div class="key-group" id="smtp-keys" style="display:none">
+        <div class="key-group-title">SMTP</div>
+        <div class="grid-2">
+          <div><label>Host</label><input type="text" id="smtp_host" placeholder="smtp.gmail.com" /></div>
+          <div><label>Port</label><input type="text" id="smtp_port" placeholder="587" /></div>
+          <div><label>Username</label><input type="text" id="smtp_username" /></div>
+          <div><label>Password</label><input type="password" id="smtp_password" /></div>
+        </div>
+      </div>
+
+    </div>
+    <button class="save-btn" onclick="saveConfig()">💾 Save keys for next time</button>
+  </div>
+
+  <!-- RUN -->
+  <div class="card">
+    <h2>Run</h2>
+    <div class="log" id="log">Ready. Press Run to start.</div>
+    <button class="run-btn" id="runBtn" onclick="runAgent()">▶ Run Weekly Brain</button>
+  </div>
+
+  <!-- REPORT -->
+  <div class="card report-box" id="reportBox">
+    <h2>Report</h2>
+    <div class="report-content" id="reportContent"></div>
+    <button class="copy-btn" onclick="copyReport()">Copy report</button>
+  </div>
+</div>
+
+<script>
+  // Replace with your deployed backend URL
+  const BACKEND = "https://your-backend.railway.app";
+
+  // ---- Dynamic key visibility ----
+  document.getElementById("llm").addEventListener("change", e => {
+    document.getElementById("openai-keys").style.display  = e.target.value === "openai"  ? "" : "none";
+    document.getElementById("claude-keys").style.display  = e.target.value === "claude"  ? "" : "none";
+  });
+  document.getElementById("calendar").addEventListener("change", e => {
+    document.getElementById("google-keys").style.display  = e.target.value === "google"  ? "" : "none";
+    document.getElementById("outlook-keys").style.display = e.target.value === "outlook" ? "" : "none";
+  });
+  document.getElementById("crm").addEventListener("change", e => {
+    ["zoho","hubspot","salesforce"].forEach(c =>
+      document.getElementById(`${c}-keys`).style.display = e.target.value === c ? "" : "none"
+    );
+  });
+  document.getElementById("email_delivery").addEventListener("change", e => {
+    document.getElementById("smtp-keys").style.display = e.target.value === "smtp" ? "" : "none";
+  });
+
+  function toggleKeys() {
+    const s = document.getElementById("keysSection");
+    const open = s.classList.toggle("open");
+    document.getElementById("toggle-icon").textContent = open ? "▼" : "▶";
+  }
+
+  function getPayload() {
+    return {
+      config: {
+        llm:            document.getElementById("llm").value,
+        calendar:       document.getElementById("calendar").value,
+        crm:            document.getElementById("crm").value,
+        email_delivery: document.getElementById("email_delivery").value,
+      },
+      keys: {
+        openai_api_key:           document.getElementById("openai_api_key").value,
+        anthropic_api_key:        document.getElementById("anthropic_api_key").value,
+        zoho_client_id:           document.getElementById("zoho_client_id").value,
+        zoho_client_secret:       document.getElementById("zoho_client_secret").value,
+        zoho_refresh_token:       document.getElementById("zoho_refresh_token").value,
+        zoho_region:              document.getElementById("zoho_region").value,
+        hubspot_api_key:          document.getElementById("hubspot_api_key").value,
+        salesforce_username:      document.getElementById("salesforce_username").value,
+        salesforce_password:      document.getElementById("salesforce_password").value,
+        salesforce_security_token:document.getElementById("salesforce_security_token").value,
+        outlook_client_id:        document.getElementById("outlook_client_id").value,
+        outlook_client_secret:    document.getElementById("outlook_client_secret").value,
+        outlook_tenant_id:        document.getElementById("outlook_tenant_id").value,
+        google_credentials_json:  btoa(document.getElementById("google_credentials_json").value || "{}"),
+        founder_email:            document.getElementById("founder_email").value,
+        sender_email:             document.getElementById("sender_email").value,
+        smtp_host:                document.getElementById("smtp_host").value,
+        smtp_port:                document.getElementById("smtp_port").value,
+        smtp_username:            document.getElementById("smtp_username").value,
+        smtp_password:            document.getElementById("smtp_password").value,
+      }
+    };
+  }
+
+  async function saveConfig() {
+    const resp = await fetch(`${BACKEND}/save-config`, {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(getPayload())
+    });
+    if (resp.ok) log("💾 Config saved.", "done");
+    else log("Save failed.", "error");
+  }
+
+  async function loadSavedConfig() {
+    try {
+      const resp = await fetch(`${BACKEND}/load-config`);
+      if (!resp.ok) return;
+      const cfg = await resp.json();
+      if (cfg.llm)            document.getElementById("llm").value            = cfg.llm;
+      if (cfg.calendar)       document.getElementById("calendar").value       = cfg.calendar;
+      if (cfg.crm)            document.getElementById("crm").value            = cfg.crm;
+      if (cfg.email_delivery) document.getElementById("email_delivery").value = cfg.email_delivery;
+      if (cfg.founder_email)  document.getElementById("founder_email").value  = cfg.founder_email;
+      if (cfg.zoho_region)    document.getElementById("zoho_region").value    = cfg.zoho_region;
+    } catch(e) {}
+  }
+  loadSavedConfig();
+
+  function log(msg, type="info") {
+    const el = document.getElementById("log");
+    el.innerHTML += `<div class="${type}">${msg}</div>`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  async function runAgent() {
+    const btn = document.getElementById("runBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Running...';
+    document.getElementById("log").innerHTML = "";
+    document.getElementById("reportBox").classList.remove("visible");
+
+    const es = new EventSource(`${BACKEND}/run`);
+
+    // POST via fetch with SSE isn't native — use fetch + ReadableStream
+    es.close();
+
+    const resp = await fetch(`${BACKEND}/run`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(getPayload())
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const text = decoder.decode(value);
+      text.split("\n").forEach(line => {
+        if (!line.startsWith("data: ")) return;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === "progress") log("→ " + ev.message, "info");
+          if (ev.type === "warning")  log("⚠ " + ev.message, "warn");
+          if (ev.type === "error")    log("✗ " + ev.message, "error");
+          if (ev.type === "done") {
+            log("✓ Done!", "done");
+            document.getElementById("reportContent").textContent = ev.report;
+            document.getElementById("reportBox").classList.add("visible");
+          }
+        } catch(e) {}
+      });
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = "▶ Run Weekly Brain";
+  }
+
+  function copyReport() {
+    navigator.clipboard.writeText(document.getElementById("reportContent").textContent);
+  }
+</script>
+</body>
+</html>
