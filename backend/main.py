@@ -64,6 +64,16 @@ def set_session(response: Response, email: str):
 def health():
     return {"status": "ok"}
 
+@app.get("/debug")
+def debug():
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "NOT SET")
+    return {
+        "google_client_id": client_id[:20] + "..." if client_id != "NOT SET" else "NOT SET",
+        "google_client_id_length": len(client_id),
+        "backend_url": os.getenv("BACKEND_URL", "NOT SET"),
+        "frontend_url": os.getenv("FRONTEND_URL", "NOT SET"),
+    }
+
 
 # ==============================
 # GOOGLE OAUTH
