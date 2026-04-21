@@ -1,82 +1,67 @@
-# backend/main.py
-
 import os
 import json
-import secrets
-from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, StreamingResponse, HTMLResponse
-from pydantic import BaseModel
-from dotenv import load_dotenv
+import urllib.parse
 import httpx
 
-from db import init_db, save_user, get_user, update_user
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, StreamingResponse
+from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from db import init_db, save_user, get_user
 from runner import run_agent
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
+# ==============================
+# APP SETUP
+# ==============================
 
 app = FastAPI()
 init_db()
 
-FRONTEND_URL      = os.getenv("FRONTEND_URL", "https://precious-mousse-ea37cf.netlify.app")
-BACKEND_URL       = os.getenv("BACKEND_URL",  "https://ai-agents-production-aa99.up.railway.app")
-
-GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
+FRONTEND_URL       = os.getenv("FRONTEND_URL")
+BACKEND_URL        = os.getenv("BACKEND_URL")
+GOOGLE_CLIENT_ID   = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_SCOPES        = " ".join([
+ZOHO_CLIENT_ID     = os.getenv("ZOHO_CLIENT_ID")
+ZOHO_CLIENT_SECRET = os.getenv("ZOHO_CLIENT_SECRET")
+ZOHO_REGION        = os.getenv("ZOHO_REGION", "in")
+
+GOOGLE_SCOPES = " ".join([
     "openid", "email", "profile",
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/calendar.readonly",
 ])
 
-ZOHO_CLIENT_ID     = os.getenv("ZOHO_CLIENT_ID")
-ZOHO_CLIENT_SECRET = os.getenv("ZOHO_CLIENT_SECRET")
-ZOHO_REGION        = os.getenv("ZOHO_REGION", "in")
-
-app.add_middleware(ProxyHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
 )
 
-# ==============================
-# SESSION HELPERS
-# ==============================
-
-def get_session_email(request: Request) -> str | None:
-    return request.cookies.get("session_email")
-
-def set_session(response: Response, email: str):
-    response.set_cookie(
-        "session_email", email,
-        httponly=True,
-        samesite="lax",
-        secure=True,
-        max_age=60*60*24*30,
-        domain=None
-    )
-
 
 # ==============================
-# HEALTH
+# HEALTH + DEBUG
 # ==============================
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "2"}
+    return {"status": "ok", "version": "3"}
 
 @app.get("/debug")
 def debug():
-    client_id = os.getenv("GOOGLE_CLIENT_ID", "NOT SET")
+    cid = os.getenv("GOOGLE_CLIENT_ID", "NOT SET")
     return {
-        "google_client_id": client_id[:20] + "..." if client_id != "NOT SET" else "NOT SET",
-        "google_client_id_length": len(client_id),
-        "backend_url": os.getenv("BACKEND_URL", "NOT SET"),
-        "frontend_url": os.getenv("FRONTEND_URL", "NOT SET"),
+        "google_client_id":        cid[:20] + "..." if cid != "NOT SET" else "NOT SET",
+        "google_client_id_length": len(cid),
+        "backend_url":             BACKEND_URL,
+        "frontend_url":            FRONTEND_URL,
     }
 
 
@@ -86,50 +71,65 @@ def debug():
 
 @app.get("/auth/google")
 def google_auth():
-    params = {
-        "client_id":     GOOGLE_CLIENT_ID,
-        "redirect_uri":  f"{BACKEND_URL}/auth/google/callback",
-        "response_type": "code",
-        "scope":         GOOGLE_SCOPES,
-        "access_type":   "offline",
-        "prompt":        "consent",
-    }
-    url = "https://accounts.google.com/o/oauth2/v2/auth?" + "&".join(f"{k}={v}" for k, v in params.items())
-    return RedirectResponse(url)
+    params = "&".join([
+        f"client_id={GOOGLE_CLIENT_ID}",
+        f"redirect_uri={BACKEND_URL}/auth/google/callback",
+        "response_type=code",
+        f"scope={urllib.parse.quote(GOOGLE_SCOPES)}",
+        "access_type=offline",
+        "prompt=consent",
+    ])
+    return HTMLResponse(f"""
+        <html><body><script>
+          window.location.replace('https://accounts.google.com/o/oauth2/v2/auth?{params}');
+        </script></body></html>
+    """)
 
 
 @app.get("/auth/google/callback")
-async def google_callback(code: str, request: Request):
-    async with httpx.AsyncClient() as client:
-        # Exchange code for tokens
-        token_resp = await client.post("https://oauth2.googleapis.com/token", data={
-            "code":          code,
-            "client_id":     GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri":  f"{BACKEND_URL}/auth/google/callback",
-            "grant_type":    "authorization_code",
-        })
-        tokens = token_resp.json()
+async def google_callback(code: str = None, error: str = None):
+    if error or not code:
+        return HTMLResponse(f"<pre>OAuth error: {error}</pre>")
+    try:
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code":          code,
+                    "client_id":     GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri":  f"{BACKEND_URL}/auth/google/callback",
+                    "grant_type":    "authorization_code",
+                }
+            )
+            tokens = token_resp.json()
+            if "error" in tokens:
+                return HTMLResponse(f"<pre>Token error: {tokens}</pre>")
 
-        # Get user email
-        userinfo_resp = await client.get(
-            "https://www.googleapis.com/oauth2/v3/userinfo",
-            headers={"Authorization": f"Bearer {tokens['access_token']}"}
-        )
-        userinfo = userinfo_resp.json()
-        email = userinfo["email"]
+            userinfo_resp = await client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {tokens['access_token']}"}
+            )
+            userinfo = userinfo_resp.json()
 
-    # Save tokens to DB
-    user = get_user(email) or {}
-    user["google_tokens"] = json.dumps(tokens)
-    user["email"]         = email
-    user["name"]          = userinfo.get("name", "")
-    save_user(email, user)
+        email = userinfo.get("email")
+        if not email:
+            return HTMLResponse(f"<pre>No email in userinfo: {userinfo}</pre>")
 
-    # Set session cookie and redirect to frontend
-    response = RedirectResponse(f"{FRONTEND_URL}?connected=google")
-    set_session(response, email)
-    return response
+        user = get_user(email) or {}
+        user["google_tokens"] = json.dumps(tokens)
+        user["email"]         = email
+        user["name"]          = userinfo.get("name", "")
+        save_user(email, user)
+
+        encoded = urllib.parse.quote(email)
+        return HTMLResponse(f"""
+            <html><body><script>
+              window.location.replace('{FRONTEND_URL}?connected=google&session={encoded}');
+            </script></body></html>
+        """)
+    except Exception as e:
+        return HTMLResponse(f"<pre>Callback exception: {str(e)}</pre>")
 
 
 # ==============================
@@ -137,74 +137,100 @@ async def google_callback(code: str, request: Request):
 # ==============================
 
 @app.get("/auth/zoho")
-def zoho_auth(request: Request):
-    email = get_session_email(request)
-    if not email:
-        raise HTTPException(status_code=401, detail="Not logged in")
-    params = {
-        "client_id":     ZOHO_CLIENT_ID,
-        "redirect_uri":  f"{BACKEND_URL}/auth/zoho/callback",
-        "response_type": "code",
-        "scope":         "ZohoCRM.modules.deals.READ,ZohoCRM.modules.contacts.READ,ZohoCRM.modules.Tasks.READ",
-        "access_type":   "offline",
-        "state":         email,
-    }
-    url = f"https://accounts.zoho.{ZOHO_REGION}/oauth/v2/auth?" + "&".join(f"{k}={v}" for k, v in params.items())
-    return RedirectResponse(url)
+def zoho_auth(email: str):
+    params = "&".join([
+        f"client_id={ZOHO_CLIENT_ID}",
+        f"redirect_uri={BACKEND_URL}/auth/zoho/callback",
+        "response_type=code",
+        "scope=ZohoCRM.modules.deals.READ,ZohoCRM.modules.contacts.READ,ZohoCRM.modules.Tasks.READ",
+        "access_type=offline",
+        f"state={urllib.parse.quote(email)}",
+    ])
+    return HTMLResponse(f"""
+        <html><body><script>
+          window.location.replace('https://accounts.zoho.{ZOHO_REGION}/oauth/v2/auth?{params}');
+        </script></body></html>
+    """)
 
 
 @app.get("/auth/zoho/callback")
-async def zoho_callback(code: str, state: str):
-    import urllib.parse
-    email = state
-    async with httpx.AsyncClient() as client:
-        token_resp = await client.post(
-            f"https://accounts.zoho.{ZOHO_REGION}/oauth/v2/token",
-            params={
-                "code":          code,
-                "client_id":     ZOHO_CLIENT_ID,
-                "client_secret": ZOHO_CLIENT_SECRET,
-                "redirect_uri":  f"{BACKEND_URL}/auth/zoho/callback",
-                "grant_type":    "authorization_code",
-            }
-        )
-        tokens = token_resp.json()
+async def zoho_callback(code: str = None, state: str = None, error: str = None):
+    if error or not code:
+        return HTMLResponse(f"<pre>Zoho OAuth error: {error}</pre>")
+    try:
+        email = urllib.parse.unquote(state)
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                f"https://accounts.zoho.{ZOHO_REGION}/oauth/v2/token",
+                params={
+                    "code":          code,
+                    "client_id":     ZOHO_CLIENT_ID,
+                    "client_secret": ZOHO_CLIENT_SECRET,
+                    "redirect_uri":  f"{BACKEND_URL}/auth/zoho/callback",
+                    "grant_type":    "authorization_code",
+                }
+            )
+            tokens = token_resp.json()
 
-    user = get_user(email) or {"email": email}
-    user["zoho_tokens"] = json.dumps(tokens)
-    save_user(email, user)
+        user = get_user(email) or {"email": email}
+        user["zoho_tokens"] = json.dumps(tokens)
+        save_user(email, user)
 
-    import urllib.parse
-    encoded_email = urllib.parse.quote(email)
-    html = f"""
-    <html><body><script>
-      window.location.replace('{FRONTEND_URL}?connected=zoho&session={encoded_email}');
-    </script></body></html>
-    """
-    return HTMLResponse(content=html)
+        encoded = urllib.parse.quote(email)
+        return HTMLResponse(f"""
+            <html><body><script>
+              window.location.replace('{FRONTEND_URL}?connected=zoho&session={encoded}');
+            </script></body></html>
+        """)
+    except Exception as e:
+        return HTMLResponse(f"<pre>Zoho callback exception: {str(e)}</pre>")
 
 
 # ==============================
-# SAVE SETTINGS (OpenAI key, emails, CRM choice)
+# STATUS
+# ==============================
+
+@app.get("/status")
+def status(email: str = None):
+    if not email:
+        return {"logged_in": False}
+    user = get_user(email)
+    if not user:
+        return {"logged_in": False}
+    return {
+        "logged_in":         True,
+        "email":             user.get("email"),
+        "name":              user.get("name"),
+        "google_connected":  bool(user.get("google_tokens")),
+        "zoho_connected":    bool(user.get("zoho_tokens")),
+        "llm":               user.get("llm", "openai"),
+        "crm":               user.get("crm", "zoho"),
+        "founder_email":     user.get("founder_email", ""),
+        "has_openai_key":    bool(user.get("openai_api_key")),
+        "has_anthropic_key": bool(user.get("anthropic_api_key")),
+    }
+
+
+# ==============================
+# SETTINGS
 # ==============================
 
 class Settings(BaseModel):
-    openai_api_key: str | None        = None
-    anthropic_api_key: str | None     = None
-    llm: str                          = "openai"
-    crm: str                          = "zoho"
-    founder_email: str
-    zoho_region: str                  = "in"
-    hubspot_api_key: str | None       = None
-    salesforce_username: str | None   = None
-    salesforce_password: str | None   = None
+    openai_api_key:            str | None = None
+    anthropic_api_key:         str | None = None
+    llm:                       str        = "openai"
+    crm:                       str        = "zoho"
+    founder_email:             str
+    zoho_region:               str        = "in"
+    hubspot_api_key:           str | None = None
+    salesforce_username:       str | None = None
+    salesforce_password:       str | None = None
     salesforce_security_token: str | None = None
-    pipedrive_api_token: str | None   = None
-    pipedrive_domain: str | None      = None
+    pipedrive_api_token:       str | None = None
+    pipedrive_domain:          str | None = None
 
 @app.post("/settings")
-def save_settings(settings: Settings, request: Request):
-    email = get_session_email(request)
+def save_settings(settings: Settings, email: str = None):
     if not email:
         raise HTTPException(status_code=401, detail="Not logged in")
     user = get_user(email) or {"email": email}
@@ -214,38 +240,11 @@ def save_settings(settings: Settings, request: Request):
 
 
 # ==============================
-# GET STATUS (for UI to check what's connected)
-# ==============================
-
-@app.get("/status")
-def status(request: Request):
-    email = get_session_email(request)
-    if not email:
-        return {"logged_in": False}
-    user = get_user(email)
-    if not user:
-        return {"logged_in": False}
-    return {
-        "logged_in":       True,
-        "email":           user.get("email"),
-        "name":            user.get("name"),
-        "google_connected": bool(user.get("google_tokens")),
-        "zoho_connected":   bool(user.get("zoho_tokens")),
-        "llm":             user.get("llm", "openai"),
-        "crm":             user.get("crm", "zoho"),
-        "founder_email":   user.get("founder_email", ""),
-        "has_openai_key":  bool(user.get("openai_api_key")),
-        "has_anthropic_key": bool(user.get("anthropic_api_key")),
-    }
-
-
-# ==============================
 # RUN AGENT
 # ==============================
 
 @app.post("/run")
-def run(request: Request):
-    email = get_session_email(request)
+def run(email: str = None):
     if not email:
         raise HTTPException(status_code=401, detail="Not logged in")
     user = get_user(email)
@@ -254,8 +253,7 @@ def run(request: Request):
 
     async def event_stream():
         async for event in run_agent(user):
-            import json as _json
-            yield f"data: {_json.dumps(event)}\n\n"
+            yield f"data: {json.dumps(event)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -265,6 +263,5 @@ def run(request: Request):
 # ==============================
 
 @app.post("/logout")
-def logout(response: Response):
-    response.delete_cookie("session_email")
+def logout(email: str = None):
     return {"status": "logged out"}
