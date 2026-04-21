@@ -161,7 +161,16 @@
       <button class="signout" onclick="signOut()">Sign out</button>
     </div>
 
-    <!-- Connections -->
+    <!-- Google banner (shown until connected) -->
+    <div id="googleBanner" class="card" style="border-color:#2a2200; background:#1a1500; display:none">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px">
+        <div>
+          <div style="font-size:0.88rem; font-weight:600; margin-bottom:4px;">📧 Connect Gmail & Calendar</div>
+          <div style="font-size:0.78rem; color:#888;">Required to fetch your emails and calendar events for the report.</div>
+        </div>
+        <button class="tag idle" style="white-space:nowrap" onclick="connectGoogle()">Connect →</button>
+      </div>
+    </div>
     <div class="card">
       <div class="card-title">Connections</div>
 
@@ -248,7 +257,20 @@
   const enc       = s     => encodeURIComponent(s);
 
   // ── Boot ─────────────────────────────────────────────
-  function boot() {
+  async function boot() {
+    // Handle OAuth return from Google
+    const p = new URLSearchParams(window.location.search);
+    const s = p.get("session");
+    const connected = p.get("connected");
+    if (s) {
+      const email = decodeURIComponent(s);
+      // Merge google_connected into existing user
+      const u = getUser() || {};
+      u.google_connected = true;
+      if (connected === "zoho") u.zoho_connected = true;
+      setUser(u);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     const u = getUser();
     if (u?.email && u?.openai_key) showApp(u);
     else showOnboarding();
@@ -295,6 +317,34 @@
     document.getElementById("uEmail").textContent       = u.email;
     if (u.founder_email) document.getElementById("founder_email").value = u.founder_email;
     onCRMChange();
+
+    // Google connection state
+    const banner    = document.getElementById("googleBanner");
+    const googleBtn = document.getElementById("googleBtn");
+    if (u.google_connected) {
+      banner.style.display      = "none";
+      googleBtn.textContent     = "✓ Connected";
+      googleBtn.className       = "tag connected";
+      googleBtn.onclick         = null;
+    } else {
+      banner.style.display      = "";
+      googleBtn.textContent     = "Connect";
+      googleBtn.className       = "tag idle";
+      googleBtn.onclick         = connectGoogle;
+    }
+
+    // Zoho state
+    if (u.zoho_connected) {
+      const b = document.getElementById("crmBtn");
+      b.className = "tag connected"; b.textContent = "✓ Connected"; b.onclick = null;
+    }
+  }
+
+  function connectGoogle() {
+    // Save current user state before leaving
+    const u = getUser();
+    if (u) setUser(u);
+    window.location.href = `${BACKEND}/auth/google`;
   }
 
   function signOut() {
