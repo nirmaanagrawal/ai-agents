@@ -5,119 +5,189 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Weekly Brain</title>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f0f0f;color:#e8e8e8;min-height:100vh;padding:40px 20px}
-    .container{max-width:620px;margin:0 auto}
-    h1{font-size:1.8rem;font-weight:700;margin-bottom:4px}
-    .subtitle{color:#888;font-size:0.9rem;margin-bottom:36px}
-    .card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:24px;margin-bottom:20px}
-    .card h2{font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#555;margin-bottom:18px}
-    label{font-size:0.82rem;color:#888;display:block;margin-bottom:4px}
-    input,select{width:100%;background:#111;border:1px solid #333;border-radius:8px;padding:10px 12px;color:#e8e8e8;font-size:0.88rem;outline:none;transition:border .2s;margin-bottom:12px}
-    input:focus,select:focus{border-color:#555}
-    input::placeholder{color:#444}
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f; color: #e8e8e8;
+      min-height: 100vh; padding: 40px 20px;
+    }
+    .wrap { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 4px; }
+    .sub { color: #666; font-size: 0.88rem; margin-bottom: 32px; }
 
-    /* Connect buttons */
-    .connect-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #222}
-    .connect-row:last-child{border-bottom:none}
-    .connect-info{display:flex;align-items:center;gap:12px}
-    .connect-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem}
-    .connect-icon.google{background:#1a1a2e}
-    .connect-icon.zoho{background:#1a2a1a}
-    .connect-name{font-size:0.9rem;font-weight:500}
-    .connect-sub{font-size:0.75rem;color:#555;margin-top:2px}
-    .connect-btn{padding:8px 16px;border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;border:none;transition:all .2s}
-    .connect-btn.idle{background:#222;color:#aaa;border:1px solid #333}
-    .connect-btn.idle:hover{background:#2a2a2a;color:#ccc}
-    .connect-btn.connected{background:#0f2a1a;color:#4bc88a;border:1px solid #1a4a2a;cursor:default}
+    .card {
+      background: #181818; border: 1px solid #252525;
+      border-radius: 12px; padding: 24px; margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .1em; color: #555; margin-bottom: 18px;
+    }
 
-    .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
-    .status-dot.green{background:#4bc88a}
-    .status-dot.gray{background:#444}
+    label { display: block; font-size: 0.8rem; color: #777; margin-bottom: 4px; }
+    input, select {
+      width: 100%; background: #0f0f0f; border: 1px solid #2a2a2a;
+      border-radius: 8px; padding: 10px 12px; color: #e8e8e8;
+      font-size: 0.875rem; outline: none; margin-bottom: 14px;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus { border-color: #444; }
+    input::placeholder { color: #3a3a3a; }
 
-    .run-btn{width:100%;padding:14px;background:#fff;color:#000;border:none;border-radius:10px;font-size:0.95rem;font-weight:600;cursor:pointer;transition:opacity .2s;margin-top:4px}
-    .run-btn:hover{opacity:.88}
-    .run-btn:disabled{opacity:.35;cursor:not-allowed}
+    /* Connection rows */
+    .conn-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid #1e1e1e;
+    }
+    .conn-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .conn-left { display: flex; align-items: center; gap: 12px; }
+    .conn-icon {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: #1e1e1e; display: flex; align-items: center;
+      justify-content: center; font-size: 1rem;
+    }
+    .conn-name { font-size: 0.88rem; font-weight: 500; }
+    .conn-sub  { font-size: 0.75rem; color: #555; margin-top: 2px; }
+    .tag {
+      font-size: 0.75rem; font-weight: 600; padding: 5px 12px;
+      border-radius: 6px; border: none; cursor: pointer;
+    }
+    .tag.idle      { background: #1e1e1e; color: #888; }
+    .tag.idle:hover{ background: #252525; color: #bbb; }
+    .tag.connected { background: #0d2b1a; color: #3dba7a; cursor: default; }
+    .tag.apikey    { background: #1a1a2b; color: #7a7aff; cursor: default; }
 
-    .log{background:#111;border:1px solid #222;border-radius:10px;padding:16px;min-height:60px;font-size:0.82rem;font-family:monospace;color:#666;line-height:1.7}
-    .log .info{color:#888}
-    .log .warn{color:#c8a84b}
-    .log .error{color:#c84b4b}
-    .log .done{color:#4bc88a}
+    /* Buttons */
+    .btn-primary {
+      width: 100%; padding: 13px; background: #fff; color: #000;
+      border: none; border-radius: 10px; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; transition: opacity .2s;
+    }
+    .btn-primary:hover    { opacity: .88; }
+    .btn-primary:disabled { opacity: .3; cursor: not-allowed; }
+    .btn-secondary {
+      width: 100%; padding: 11px; background: transparent; color: #666;
+      border: 1px solid #252525; border-radius: 10px; font-size: 0.85rem;
+      cursor: pointer; transition: all .2s; margin-top: 8px;
+    }
+    .btn-secondary:hover { border-color: #444; color: #aaa; }
 
-    .report-box{display:none}
-    .report-box.visible{display:block}
-    .report-content{background:#111;border:1px solid #222;border-radius:10px;padding:20px;white-space:pre-wrap;font-size:0.85rem;line-height:1.8;color:#ccc;font-family:monospace}
-    .copy-btn{margin-top:10px;padding:9px 18px;background:#222;border:1px solid #333;border-radius:8px;color:#aaa;font-size:0.82rem;cursor:pointer}
-    .copy-btn:hover{background:#2a2a2a}
+    .google-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: #fff; color: #111; border: none; border-radius: 10px;
+      padding: 13px 28px; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .google-btn:hover { opacity: .9; }
 
-    .spinner{display:inline-block;width:12px;height:12px;border:2px solid #333;border-top-color:#888;border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle}
-    @keyframes spin{to{transform:rotate(360deg)}}
+    /* User bar */
+    .user-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #181818; border: 1px solid #252525; border-radius: 10px;
+      padding: 11px 16px; margin-bottom: 16px; font-size: 0.83rem;
+    }
+    .user-bar span { color: #ccc; font-weight: 500; }
+    .signout {
+      background: none; border: 1px solid #2a2a2a; border-radius: 6px;
+      color: #555; font-size: 0.75rem; padding: 4px 10px; cursor: pointer;
+    }
+    .signout:hover { color: #aaa; border-color: #444; }
 
-    .user-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding:12px 16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px}
-    .user-bar-info{font-size:0.85rem;color:#888}
-    .user-bar-info span{color:#ccc;font-weight:500}
-    .logout-btn{background:none;border:1px solid #333;border-radius:6px;color:#666;font-size:0.78rem;padding:5px 10px;cursor:pointer}
-    .logout-btn:hover{color:#aaa;border-color:#555}
+    /* Log */
+    .log {
+      background: #0f0f0f; border: 1px solid #1e1e1e; border-radius: 8px;
+      padding: 14px; min-height: 60px; font-family: monospace;
+      font-size: 0.8rem; line-height: 1.8; margin-bottom: 14px;
+      max-height: 200px; overflow-y: auto;
+    }
+    .log .info  { color: #777; }
+    .log .warn  { color: #b8920a; }
+    .log .err   { color: #b84a4a; }
+    .log .ok    { color: #3dba7a; }
 
-    #loginSection{text-align:center;padding:60px 0}
-    #loginSection p{color:#666;margin-bottom:24px;font-size:0.9rem}
-    .google-signin{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#222;border:none;border-radius:10px;padding:13px 24px;font-size:0.95rem;font-weight:600;cursor:pointer;transition:opacity .2s}
-    .google-signin:hover{opacity:.9}
+    /* Report */
+    .report {
+      background: #0f0f0f; border: 1px solid #1e1e1e; border-radius: 8px;
+      padding: 18px; white-space: pre-wrap; font-family: monospace;
+      font-size: 0.82rem; line-height: 1.8; color: #bbb;
+    }
+    .copy {
+      margin-top: 10px; padding: 8px 16px; background: #1e1e1e;
+      border: 1px solid #2a2a2a; border-radius: 7px;
+      color: #888; font-size: 0.8rem; cursor: pointer;
+    }
+    .copy:hover { background: #252525; }
+
+    .spinner {
+      display: inline-block; width: 11px; height: 11px;
+      border: 2px solid #333; border-top-color: #888;
+      border-radius: 50%; animation: spin .6s linear infinite;
+      margin-right: 7px; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Login screen */
+    #login { text-align: center; padding: 80px 0; }
+    #login p { color: #555; font-size: 0.88rem; margin-bottom: 28px; line-height: 1.7; }
   </style>
 </head>
 <body>
-<div class="container">
+<div class="wrap">
   <h1>🧠 Weekly Brain</h1>
-  <p class="subtitle">Autonomous startup digest — Gmail · Calendar · CRM → your inbox</p>
+  <p class="sub">Autonomous startup digest — Gmail · Calendar · CRM → your inbox</p>
 
-  <!-- LOGIN STATE -->
-  <div id="loginSection">
+  <!-- ===== LOGIN ===== -->
+  <div id="login">
     <p>Sign in with Google to get started.<br/>Gmail and Calendar access will be requested at the same time.</p>
-    <button class="google-signin" onclick="signInGoogle()">
-      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+    <button class="google-btn" onclick="signInGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
+      </svg>
       Sign in with Google
     </button>
   </div>
 
-  <!-- MAIN APP (shown after login) -->
-  <div id="appSection" style="display:none">
+  <!-- ===== APP ===== -->
+  <div id="app" style="display:none">
 
     <div class="user-bar">
-      <div class="user-bar-info">Signed in as <span id="userEmail"></span></div>
-      <button class="logout-btn" onclick="logout()">Sign out</button>
+      Signed in as <span id="uEmail"></span>
+      <button class="signout" onclick="signOut()">Sign out</button>
     </div>
 
-    <!-- CONNECTIONS -->
+    <!-- Connections -->
     <div class="card">
-      <h2>Connections</h2>
-      <div class="connect-row">
-        <div class="connect-info">
-          <div class="connect-icon google">📧</div>
+      <div class="card-title">Connections</div>
+
+      <div class="conn-row">
+        <div class="conn-left">
+          <div class="conn-icon">📧</div>
           <div>
-            <div class="connect-name">Google</div>
-            <div class="connect-sub">Gmail + Calendar</div>
+            <div class="conn-name">Google</div>
+            <div class="conn-sub">Gmail + Calendar</div>
           </div>
         </div>
-        <button class="connect-btn connected" id="googleBtn">✓ Connected</button>
+        <span class="tag connected">✓ Connected</span>
       </div>
 
-      <!-- CRM row — changes based on selection -->
-      <div class="connect-row" id="crmConnectRow">
-        <div class="connect-info">
-          <div class="connect-icon zoho" id="crmIcon">📊</div>
+      <div class="conn-row" id="crmRow">
+        <div class="conn-left">
+          <div class="conn-icon" id="crmIcon">📊</div>
           <div>
-            <div class="connect-name" id="crmName">Zoho CRM</div>
-            <div class="connect-sub" id="crmSub">Deals, Contacts, Tasks</div>
+            <div class="conn-name" id="crmName">Zoho CRM</div>
+            <div class="conn-sub" id="crmSub">Deals, Contacts, Tasks</div>
           </div>
         </div>
-        <button class="connect-btn idle" id="crmBtn" onclick="connectCRM()">Connect</button>
+        <button class="tag idle" id="crmBtn" onclick="connectCRM()">Connect</button>
       </div>
     </div>
 
-    <!-- SETTINGS -->
+    <!-- Settings -->
     <div class="card">
-      <h2>Settings</h2>
+      <div class="card-title">Settings</div>
 
       <label>CRM</label>
       <select id="crm" onchange="onCRMChange()">
@@ -128,60 +198,52 @@
         <option value="none">None</option>
       </select>
 
-      <!-- HubSpot key (OAuth not needed — just API key) -->
-      <div id="hubspot-key-field" style="display:none">
+      <div id="f-hubspot" style="display:none">
         <label>HubSpot API Key</label>
-        <input type="password" id="hubspot_api_key" placeholder="pat-..." />
+        <input type="password" id="hubspot_api_key" placeholder="pat-..."/>
+      </div>
+      <div id="f-salesforce" style="display:none">
+        <label>Salesforce Username</label><input type="text" id="sf_user"/>
+        <label>Salesforce Password</label><input type="password" id="sf_pass"/>
+        <label>Security Token</label><input type="password" id="sf_token"/>
+      </div>
+      <div id="f-pipedrive" style="display:none">
+        <label>Pipedrive API Token</label><input type="password" id="pd_token"/>
+        <label>Company Domain</label><input type="text" id="pd_domain" placeholder="yourcompany"/>
       </div>
 
-      <!-- Salesforce fields -->
-      <div id="salesforce-fields" style="display:none">
-        <label>Salesforce Username</label>
-        <input type="text" id="salesforce_username" placeholder="user@company.com" />
-        <label>Salesforce Password</label>
-        <input type="password" id="salesforce_password" />
-        <label>Security Token</label>
-        <input type="password" id="salesforce_security_token" />
-      </div>
-
-      <!-- Pipedrive key -->
-      <div id="pipedrive-key-field" style="display:none">
-        <label>Pipedrive API Token</label>
-        <input type="password" id="pipedrive_api_token" placeholder="abc123..." />
-        <label>Company Domain</label>
-        <input type="text" id="pipedrive_domain" placeholder="yourcompany" />
-      </div>
-
-      <label style="margin-top:4px">LLM</label>
-      <select id="llm">
+      <label>LLM</label>
+      <select id="llm" onchange="onLLMChange()">
         <option value="openai">OpenAI (gpt-4.1)</option>
         <option value="claude">Claude (Anthropic)</option>
       </select>
-      <div id="openai-key-field">
+      <div id="f-openai">
         <label>OpenAI API Key</label>
-        <input type="password" id="openai_api_key" placeholder="sk-proj-..." />
+        <input type="password" id="openai_key" placeholder="sk-proj-..."/>
       </div>
-      <div id="claude-key-field" style="display:none">
+      <div id="f-claude" style="display:none">
         <label>Anthropic API Key</label>
-        <input type="password" id="anthropic_api_key" placeholder="sk-ant-..." />
+        <input type="password" id="anthropic_key" placeholder="sk-ant-..."/>
       </div>
+
       <label>Report recipient email</label>
-      <input type="email" id="founder_email" placeholder="you@yourdomain.com" />
-      <button class="run-btn" style="background:#222;color:#aaa;border:1px solid #333;margin-top:0" onclick="saveSettings()">Save settings</button>
+      <input type="email" id="founder_email" placeholder="you@yourdomain.com"/>
+
+      <button class="btn-secondary" onclick="saveSettings()">💾 Save settings</button>
     </div>
 
-    <!-- RUN -->
+    <!-- Run -->
     <div class="card">
-      <h2>Run</h2>
+      <div class="card-title">Run</div>
       <div class="log" id="log">Ready. Press Run to generate your weekly report.</div>
-      <button class="run-btn" id="runBtn" onclick="runAgent()">▶ Run Weekly Brain</button>
+      <button class="btn-primary" id="runBtn" onclick="runAgent()">▶ Run Weekly Brain</button>
     </div>
 
-    <!-- REPORT -->
-    <div class="card report-box" id="reportBox">
-      <h2>Report</h2>
-      <div class="report-content" id="reportContent"></div>
-      <button class="copy-btn" onclick="copyReport()">Copy report</button>
+    <!-- Report -->
+    <div class="card" id="reportCard" style="display:none">
+      <div class="card-title">Report</div>
+      <div class="report" id="reportText"></div>
+      <button class="copy" onclick="copyReport()">Copy</button>
     </div>
 
   </div>
@@ -190,149 +252,130 @@
 <script>
   const BACKEND = "https://ai-agents-production-aa99.up.railway.app";
 
-  document.getElementById("llm").addEventListener("change", e => {
-    document.getElementById("openai-key-field").style.display = e.target.value === "openai" ? "" : "none";
-    document.getElementById("claude-key-field").style.display = e.target.value === "claude" ? "" : "none";
-  });
+  // ── Session ──────────────────────────────────────────
+  const getEmail  = () => localStorage.getItem("wb_email");
+  const setEmail  = e  => localStorage.setItem("wb_email", e);
+  const clearEmail= () => localStorage.removeItem("wb_email");
 
-  const CRM_META = {
-    zoho:       { name: "Zoho CRM",    sub: "Deals, Contacts, Tasks", icon: "📊", oauth: true },
-    hubspot:    { name: "HubSpot",     sub: "Deals, Contacts",        icon: "🟠", oauth: false },
-    salesforce: { name: "Salesforce",  sub: "Opportunities, Contacts",icon: "☁️", oauth: false },
-    pipedrive:  { name: "Pipedrive",   sub: "Deals, Contacts",        icon: "🔵", oauth: false },
-    none:       { name: "No CRM",      sub: "Skip CRM data",          icon: "➖", oauth: false },
-  };
-
-  function onCRMChange() {
-    const crm  = document.getElementById("crm").value;
-    const meta = CRM_META[crm];
-
-    // Update connect row
-    document.getElementById("crmName").textContent = meta.name;
-    document.getElementById("crmSub").textContent  = meta.sub;
-    document.getElementById("crmIcon").textContent = meta.icon;
-
-    // Show/hide connect button vs key fields
-    const crmRow = document.getElementById("crmConnectRow");
-    crmRow.style.display = crm === "none" ? "none" : "";
-
-    const btn = document.getElementById("crmBtn");
-    btn.className = "connect-btn idle";
-    btn.textContent = meta.oauth ? "Connect" : "Not needed";
-    if (!meta.oauth) {
-      btn.className   = "connect-btn connected";
-      btn.textContent = "Use API Key ↓";
+  // ── Boot ─────────────────────────────────────────────
+  (async function boot() {
+    // Handle OAuth return
+    const p = new URLSearchParams(window.location.search);
+    const s = p.get("session");
+    if (s) {
+      setEmail(decodeURIComponent(s));
+      window.history.replaceState({}, "", "/");
     }
 
-    // Show relevant key fields
-    document.getElementById("hubspot-key-field").style.display    = crm === "hubspot"    ? "" : "none";
-    document.getElementById("salesforce-fields").style.display    = crm === "salesforce" ? "" : "none";
-    document.getElementById("pipedrive-key-field").style.display  = crm === "pipedrive"  ? "" : "none";
-  }
+    const email = getEmail();
+    if (!email) { showLogin(); return; }
 
-  function connectCRM() {
-    const crm = document.getElementById("crm").value;
-    if (crm === "zoho") connectZoho();
-  }
+    const status = await apiFetch(`/status?email=${enc(email)}`);
+    if (status?.logged_in) showApp(status);
+    else { clearEmail(); showLogin(); }
+  })();
 
-  function connectZoho() {
-    window.location.href = `${BACKEND}/auth/zoho`;
-  }
-
-  // ---- Session helpers (localStorage instead of cookie) ----
-  function getSession() { return localStorage.getItem("session_email"); }
-  function setSession(email) { localStorage.setItem("session_email", email); }
-  function clearSession() { localStorage.removeItem("session_email"); }
-
-  // ---- Check session on load ----
-  async function checkStatus() {
-    const email = getSession();
-    if (!email) {
-      document.getElementById("loginSection").style.display = "";
-      document.getElementById("appSection").style.display   = "none";
-      return;
-    }
-    const resp = await fetch(`${BACKEND}/status?email=${encodeURIComponent(email)}`, { credentials: "include" });
-    const s = await resp.json();
-    if (s.logged_in) {
-      showApp(s);
-    } else {
-      clearSession();
-      document.getElementById("loginSection").style.display = "";
-      document.getElementById("appSection").style.display   = "none";
-    }
-  }
-
-  function showApp(s) {
-    document.getElementById("loginSection").style.display = "none";
-    document.getElementById("appSection").style.display   = "";
-    document.getElementById("userEmail").textContent      = s.email;
-    if (s.founder_email) document.getElementById("founder_email").value = s.founder_email;
-    if (s.llm)           document.getElementById("llm").value           = s.llm;
-    if (s.crm)         { document.getElementById("crm").value           = s.crm; onCRMChange(); }
-    if (s.zoho_connected) {
-      const btn = document.getElementById("crmBtn");
-      btn.textContent = "✓ Connected";
-      btn.className   = "connect-btn connected";
-      btn.onclick     = null;
-    }
-  }
-
-  // ---- Auth ----
+  // ── Auth ─────────────────────────────────────────────
   function signInGoogle() {
     window.location.href = `${BACKEND}/auth/google`;
   }
 
-  function connectZoho() {
-    window.location.href = `${BACKEND}/auth/zoho`;
+  function signOut() {
+    clearEmail();
+    showLogin();
   }
 
-  async function logout() {
-    await fetch(`${BACKEND}/logout`, { method: "POST", credentials: "include" });
-    clearSession();
-    checkStatus();
+  // ── CRM logic ────────────────────────────────────────
+  const CRM = {
+    zoho:       { name:"Zoho CRM",   sub:"Deals, Contacts, Tasks", icon:"📊", oauth:true  },
+    hubspot:    { name:"HubSpot",    sub:"Deals, Contacts",        icon:"🟠", oauth:false },
+    salesforce: { name:"Salesforce", sub:"Opportunities",          icon:"☁️", oauth:false },
+    pipedrive:  { name:"Pipedrive",  sub:"Deals, Contacts",        icon:"🔵", oauth:false },
+    none:       { name:"No CRM",     sub:"Skip CRM",               icon:"➖", oauth:false },
+  };
+
+  function onCRMChange() {
+    const v = document.getElementById("crm").value;
+    const m = CRM[v];
+    document.getElementById("crmIcon").textContent = m.icon;
+    document.getElementById("crmName").textContent = m.name;
+    document.getElementById("crmSub").textContent  = m.sub;
+    document.getElementById("crmRow").style.display = v === "none" ? "none" : "";
+    const btn = document.getElementById("crmBtn");
+    if (m.oauth) {
+      btn.className = "tag idle"; btn.textContent = "Connect"; btn.onclick = connectCRM;
+    } else {
+      btn.className = "tag apikey"; btn.textContent = "Use API Key ↓"; btn.onclick = null;
+    }
+    ["hubspot","salesforce","pipedrive"].forEach(c =>
+      document.getElementById(`f-${c}`).style.display = v === c ? "" : "none"
+    );
   }
 
-  // ---- Settings ----
+  function connectCRM() {
+    const crm   = document.getElementById("crm").value;
+    const email = getEmail();
+    if (crm === "zoho") window.location.href = `${BACKEND}/auth/zoho?email=${enc(email)}`;
+  }
+
+  function onLLMChange() {
+    const v = document.getElementById("llm").value;
+    document.getElementById("f-openai").style.display = v === "openai" ? "" : "none";
+    document.getElementById("f-claude").style.display = v === "claude" ? "" : "none";
+  }
+
+  // ── Show/hide ─────────────────────────────────────────
+  function showLogin() {
+    document.getElementById("login").style.display = "";
+    document.getElementById("app").style.display   = "none";
+  }
+
+  function showApp(s) {
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display   = "";
+    document.getElementById("uEmail").textContent  = s.email;
+    if (s.founder_email) document.getElementById("founder_email").value = s.founder_email;
+    if (s.llm)           { document.getElementById("llm").value = s.llm; onLLMChange(); }
+    if (s.crm)           { document.getElementById("crm").value = s.crm; onCRMChange(); }
+    if (s.zoho_connected) {
+      const b = document.getElementById("crmBtn");
+      b.className = "tag connected"; b.textContent = "✓ Connected"; b.onclick = null;
+    }
+  }
+
+  // ── Settings ──────────────────────────────────────────
   async function saveSettings() {
-    const email = getSession();
-    const payload = {
-      llm:                   document.getElementById("llm").value,
-      crm:                   document.getElementById("crm").value,
-      openai_api_key:        document.getElementById("openai_api_key").value,
-      anthropic_api_key:     document.getElementById("anthropic_api_key").value,
-      hubspot_api_key:       document.getElementById("hubspot_api_key").value,
-      salesforce_username:   document.getElementById("salesforce_username").value,
-      salesforce_password:   document.getElementById("salesforce_password").value,
-      salesforce_security_token: document.getElementById("salesforce_security_token").value,
-      pipedrive_api_token:   document.getElementById("pipedrive_api_token").value,
-      pipedrive_domain:      document.getElementById("pipedrive_domain").value,
-      founder_email:         document.getElementById("founder_email").value,
+    const email = getEmail();
+    const body = {
+      llm:                       document.getElementById("llm").value,
+      crm:                       document.getElementById("crm").value,
+      openai_api_key:            document.getElementById("openai_key").value,
+      anthropic_api_key:         document.getElementById("anthropic_key").value,
+      hubspot_api_key:           document.getElementById("hubspot_api_key").value,
+      salesforce_username:       document.getElementById("sf_user").value,
+      salesforce_password:       document.getElementById("sf_pass").value,
+      salesforce_security_token: document.getElementById("sf_token").value,
+      pipedrive_api_token:       document.getElementById("pd_token").value,
+      pipedrive_domain:          document.getElementById("pd_domain").value,
+      founder_email:             document.getElementById("founder_email").value,
     };
-    const resp = await fetch(`${BACKEND}/settings?email=${encodeURIComponent(email)}`, {
-      method: "POST", credentials: "include",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload)
-    });
-    if (resp.ok) log("✓ Settings saved.", "done");
-    else log("Save failed — are you signed in?", "error");
+    const r = await apiFetch(`/settings?email=${enc(email)}`, "POST", body);
+    log(r?.status === "saved" ? "✓ Settings saved." : "Save failed.", r?.status === "saved" ? "ok" : "err");
   }
 
-  // ---- Run ----
+  // ── Run ───────────────────────────────────────────────
   async function runAgent() {
-    const email = getSession();
-    const btn = document.getElementById("runBtn");
+    const email = getEmail();
+    const btn   = document.getElementById("runBtn");
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Running...';
     document.getElementById("log").innerHTML = "";
-    document.getElementById("reportBox").classList.remove("visible");
+    document.getElementById("reportCard").style.display = "none";
 
-    const resp = await fetch(`${BACKEND}/run?email=${encodeURIComponent(email)}`, {
-      method: "POST", credentials: "include"
-    });
-
+    const resp = await fetch(`${BACKEND}/run?email=${enc(email)}`, { method: "POST" });
     const reader  = resp.body.getReader();
     const decoder = new TextDecoder();
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -342,38 +385,40 @@
           const ev = JSON.parse(line.slice(6));
           if (ev.type === "progress") log("→ " + ev.message, "info");
           if (ev.type === "warning")  log("⚠ " + ev.message, "warn");
-          if (ev.type === "error")    log("✗ " + ev.message, "error");
+          if (ev.type === "error")    log("✗ " + ev.message, "err");
           if (ev.type === "done") {
-            log("✓ Done!", "done");
-            document.getElementById("reportContent").textContent = ev.report;
-            document.getElementById("reportBox").classList.add("visible");
+            log("✓ Done!", "ok");
+            document.getElementById("reportText").textContent = ev.report;
+            document.getElementById("reportCard").style.display = "";
           }
-        } catch(e) {}
+        } catch {}
       });
     }
     btn.disabled = false;
     btn.innerHTML = "▶ Run Weekly Brain";
   }
 
-  function log(msg, type="info") {
+  // ── Helpers ───────────────────────────────────────────
+  const enc = e => encodeURIComponent(e);
+
+  async function apiFetch(path, method = "GET", body = null) {
+    try {
+      const opts = { method, headers: {} };
+      if (body) { opts.body = JSON.stringify(body); opts.headers["Content-Type"] = "application/json"; }
+      const r = await fetch(BACKEND + path, opts);
+      return await r.json();
+    } catch { return null; }
+  }
+
+  function log(msg, type = "info") {
     const el = document.getElementById("log");
     el.innerHTML += `<div class="${type}">${msg}</div>`;
     el.scrollTop = el.scrollHeight;
   }
 
   function copyReport() {
-    navigator.clipboard.writeText(document.getElementById("reportContent").textContent);
+    navigator.clipboard.writeText(document.getElementById("reportText").textContent);
   }
-
-  // ---- Handle redirect back from OAuth ----
-  const params = new URLSearchParams(window.location.search);
-  const sessionEmail = params.get("session");
-  if (sessionEmail) {
-    setSession(decodeURIComponent(sessionEmail));
-    window.history.replaceState({}, "", "/");
-  }
-
-  checkStatus();
 </script>
 </body>
 </html>
