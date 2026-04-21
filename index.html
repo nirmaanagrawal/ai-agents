@@ -11,7 +11,7 @@
       background: #0f0f0f; color: #e8e8e8;
       min-height: 100vh; padding: 40px 20px;
     }
-    .wrap { max-width: 600px; margin: 0 auto; }
+    .wrap { max-width: 580px; margin: 0 auto; }
     h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 4px; }
     .sub { color: #666; font-size: 0.88rem; margin-bottom: 32px; }
 
@@ -34,6 +34,20 @@
     input:focus, select:focus { border-color: #444; }
     input::placeholder { color: #3a3a3a; }
 
+    .btn-primary {
+      width: 100%; padding: 13px; background: #fff; color: #000;
+      border: none; border-radius: 10px; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; transition: opacity .2s;
+    }
+    .btn-primary:hover    { opacity: .88; }
+    .btn-primary:disabled { opacity: .3; cursor: not-allowed; }
+    .btn-secondary {
+      width: 100%; padding: 11px; background: transparent; color: #666;
+      border: 1px solid #252525; border-radius: 10px; font-size: 0.85rem;
+      cursor: pointer; transition: all .2s; margin-top: 8px;
+    }
+    .btn-secondary:hover { border-color: #444; color: #aaa; }
+
     /* Connection rows */
     .conn-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -52,33 +66,10 @@
       font-size: 0.75rem; font-weight: 600; padding: 5px 12px;
       border-radius: 6px; border: none; cursor: pointer;
     }
-    .tag.idle      { background: #1e1e1e; color: #888; }
-    .tag.idle:hover{ background: #252525; color: #bbb; }
-    .tag.connected { background: #0d2b1a; color: #3dba7a; cursor: default; }
-    .tag.apikey    { background: #1a1a2b; color: #7a7aff; cursor: default; }
-
-    /* Buttons */
-    .btn-primary {
-      width: 100%; padding: 13px; background: #fff; color: #000;
-      border: none; border-radius: 10px; font-size: 0.9rem;
-      font-weight: 600; cursor: pointer; transition: opacity .2s;
-    }
-    .btn-primary:hover    { opacity: .88; }
-    .btn-primary:disabled { opacity: .3; cursor: not-allowed; }
-    .btn-secondary {
-      width: 100%; padding: 11px; background: transparent; color: #666;
-      border: 1px solid #252525; border-radius: 10px; font-size: 0.85rem;
-      cursor: pointer; transition: all .2s; margin-top: 8px;
-    }
-    .btn-secondary:hover { border-color: #444; color: #aaa; }
-
-    .google-btn {
-      display: inline-flex; align-items: center; gap: 10px;
-      background: #fff; color: #111; border: none; border-radius: 10px;
-      padding: 13px 28px; font-size: 0.9rem; font-weight: 600;
-      cursor: pointer; transition: opacity .2s;
-    }
-    .google-btn:hover { opacity: .9; }
+    .tag.idle       { background: #1e1e1e; color: #888; }
+    .tag.idle:hover { background: #252525; color: #bbb; }
+    .tag.connected  { background: #0d2b1a; color: #3dba7a; cursor: default; }
+    .tag.apikey     { background: #1a1a2b; color: #7a7aff; cursor: default; }
 
     /* User bar */
     .user-bar {
@@ -100,10 +91,10 @@
       font-size: 0.8rem; line-height: 1.8; margin-bottom: 14px;
       max-height: 200px; overflow-y: auto;
     }
-    .log .info  { color: #777; }
-    .log .warn  { color: #b8920a; }
-    .log .err   { color: #b84a4a; }
-    .log .ok    { color: #3dba7a; }
+    .log .info { color: #777; }
+    .log .warn { color: #b8920a; }
+    .log .err  { color: #b84a4a; }
+    .log .ok   { color: #3dba7a; }
 
     /* Report */
     .report {
@@ -126,9 +117,11 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Login screen */
-    #login { text-align: center; padding: 80px 0; }
-    #login p { color: #555; font-size: 0.88rem; margin-bottom: 28px; line-height: 1.7; }
+    /* Onboarding */
+    #onboarding { max-width: 420px; margin: 60px auto 0; }
+    #onboarding h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 6px; }
+    #onboarding p  { color: #555; font-size: 0.85rem; margin-bottom: 24px; line-height: 1.6; }
+    .error-msg { color: #b84a4a; font-size: 0.8rem; margin-bottom: 12px; display: none; }
   </style>
 </head>
 <body>
@@ -136,38 +129,57 @@
   <h1>🧠 Weekly Brain</h1>
   <p class="sub">Autonomous startup digest — Gmail · Calendar · CRM → your inbox</p>
 
-  <!-- ===== LOGIN ===== -->
-  <div id="login">
-    <p>Sign in with Google to get started.<br/>Gmail and Calendar access will be requested at the same time.</p>
-    <button class="google-btn" onclick="signInGoogle()">
-      <svg width="18" height="18" viewBox="0 0 18 18">
-        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
-        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-        <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
-        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
-      </svg>
-      Sign in with Google
-    </button>
+  <!-- ===== ONBOARDING ===== -->
+  <div id="onboarding">
+    <div class="card">
+      <div class="card-title">Get Started</div>
+      <h2>Set up your account</h2>
+      <p>Enter your details below to start generating your weekly startup digest.</p>
+
+      <label>Your Name</label>
+      <input type="text" id="ob_name" placeholder="Akash Ambade"/>
+
+      <label>Your Email</label>
+      <input type="email" id="ob_email" placeholder="you@yourcompany.com"/>
+
+      <label>OpenAI API Key</label>
+      <input type="password" id="ob_key" placeholder="sk-proj-..."/>
+      <div style="font-size:0.75rem; color:#444; margin-top:-10px; margin-bottom:14px;">
+        Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#666;">platform.openai.com/api-keys</a>
+      </div>
+
+      <div class="error-msg" id="ob_error">Please fill in all fields.</div>
+      <button class="btn-primary" onclick="submitOnboarding()">Get Started →</button>
+    </div>
   </div>
 
   <!-- ===== APP ===== -->
   <div id="app" style="display:none">
 
     <div class="user-bar">
-      Signed in as <span id="uEmail"></span>
+      Welcome, <span id="uName"></span> &nbsp;·&nbsp; <span id="uEmail" style="color:#555"></span>
       <button class="signout" onclick="signOut()">Sign out</button>
     </div>
 
-    <!-- Connections -->
+    <!-- Google banner (shown until connected) -->
+    <div id="googleBanner" class="card" style="border-color:#2a2200; background:#1a1500; display:none">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px">
+        <div>
+          <div style="font-size:0.88rem; font-weight:600; margin-bottom:4px;">📧 Connect Gmail & Calendar</div>
+          <div style="font-size:0.78rem; color:#888;">Required to fetch your emails and calendar events for the report.</div>
+        </div>
+        <button class="tag idle" style="white-space:nowrap" onclick="connectGoogle()">Connect →</button>
+      </div>
+    </div>
     <div class="card">
       <div class="card-title">Connections</div>
 
       <div class="conn-row">
         <div class="conn-left">
-          <div class="conn-icon">📧</div>
+          <div class="conn-icon">🔑</div>
           <div>
-            <div class="conn-name">Google</div>
-            <div class="conn-sub">Gmail + Calendar</div>
+            <div class="conn-name">OpenAI</div>
+            <div class="conn-sub">Report generation</div>
           </div>
         </div>
         <span class="tag connected">✓ Connected</span>
@@ -212,20 +224,6 @@
         <label>Company Domain</label><input type="text" id="pd_domain" placeholder="yourcompany"/>
       </div>
 
-      <label>LLM</label>
-      <select id="llm" onchange="onLLMChange()">
-        <option value="openai">OpenAI (gpt-4.1)</option>
-        <option value="claude">Claude (Anthropic)</option>
-      </select>
-      <div id="f-openai">
-        <label>OpenAI API Key</label>
-        <input type="password" id="openai_key" placeholder="sk-proj-..."/>
-      </div>
-      <div id="f-claude" style="display:none">
-        <label>Anthropic API Key</label>
-        <input type="password" id="anthropic_key" placeholder="sk-ant-..."/>
-      </div>
-
       <label>Report recipient email</label>
       <input type="email" id="founder_email" placeholder="you@yourdomain.com"/>
 
@@ -253,39 +251,108 @@
   const BACKEND = "https://ai-agents-production-aa99.up.railway.app";
 
   // ── Session ──────────────────────────────────────────
-  const getEmail  = () => localStorage.getItem("wb_email");
-  const setEmail  = e  => localStorage.setItem("wb_email", e);
-  const clearEmail= () => localStorage.removeItem("wb_email");
+  const getUser   = ()    => { try { return JSON.parse(localStorage.getItem("wb_user")); } catch { return null; } };
+  const setUser   = u     => localStorage.setItem("wb_user", JSON.stringify(u));
+  const clearUser = ()    => localStorage.removeItem("wb_user");
+  const enc       = s     => encodeURIComponent(s);
 
   // ── Boot ─────────────────────────────────────────────
-  (async function boot() {
-    // Handle OAuth return
+  async function boot() {
+    // Handle OAuth return from Google
     const p = new URLSearchParams(window.location.search);
     const s = p.get("session");
+    const connected = p.get("connected");
     if (s) {
-      setEmail(decodeURIComponent(s));
-      window.history.replaceState({}, "", "/");
+      const email = decodeURIComponent(s);
+      // Merge google_connected into existing user
+      const u = getUser() || {};
+      u.google_connected = true;
+      if (connected === "zoho") u.zoho_connected = true;
+      setUser(u);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    const u = getUser();
+    if (u?.email && u?.openai_key) showApp(u);
+    else showOnboarding();
+  }
+
+  // ── Onboarding ────────────────────────────────────────
+  function showOnboarding() {
+    document.getElementById("onboarding").style.display = "";
+    document.getElementById("app").style.display        = "none";
+  }
+
+  async function submitOnboarding() {
+    const name  = document.getElementById("ob_name").value.trim();
+    const email = document.getElementById("ob_email").value.trim();
+    const key   = document.getElementById("ob_key").value.trim();
+    const errEl = document.getElementById("ob_error");
+
+    if (!name || !email || !key) {
+      errEl.textContent = "Please fill in all fields.";
+      errEl.style.display = "block";
+      return;
+    }
+    errEl.style.display = "none";
+
+    const user = { name, email, openai_key: key, founder_email: email };
+    setUser(user);
+
+    // Save to backend
+    await apiFetch(`/settings?email=${enc(email)}`, "POST", {
+      llm:           "openai",
+      crm:           "none",
+      openai_api_key: key,
+      founder_email:  email,
+    });
+
+    showApp(user);
+  }
+
+  // ── App ───────────────────────────────────────────────
+  function showApp(u) {
+    document.getElementById("onboarding").style.display = "none";
+    document.getElementById("app").style.display        = "";
+    document.getElementById("uName").textContent        = u.name;
+    document.getElementById("uEmail").textContent       = u.email;
+    if (u.founder_email) document.getElementById("founder_email").value = u.founder_email;
+    onCRMChange();
+
+    // Google connection state
+    const banner    = document.getElementById("googleBanner");
+    const googleBtn = document.getElementById("googleBtn");
+    if (u.google_connected) {
+      banner.style.display      = "none";
+      googleBtn.textContent     = "✓ Connected";
+      googleBtn.className       = "tag connected";
+      googleBtn.onclick         = null;
+    } else {
+      banner.style.display      = "";
+      googleBtn.textContent     = "Connect";
+      googleBtn.className       = "tag idle";
+      googleBtn.onclick         = connectGoogle;
     }
 
-    const email = getEmail();
-    if (!email) { showLogin(); return; }
+    // Zoho state
+    if (u.zoho_connected) {
+      const b = document.getElementById("crmBtn");
+      b.className = "tag connected"; b.textContent = "✓ Connected"; b.onclick = null;
+    }
+  }
 
-    const status = await apiFetch(`/status?email=${enc(email)}`);
-    if (status?.logged_in) showApp(status);
-    else { clearEmail(); showLogin(); }
-  })();
-
-  // ── Auth ─────────────────────────────────────────────
-  function signInGoogle() {
+  function connectGoogle() {
+    // Save current user state before leaving
+    const u = getUser();
+    if (u) setUser(u);
     window.location.href = `${BACKEND}/auth/google`;
   }
 
   function signOut() {
-    clearEmail();
-    showLogin();
+    clearUser();
+    showOnboarding();
   }
 
-  // ── CRM logic ────────────────────────────────────────
+  // ── CRM ───────────────────────────────────────────────
   const CRM = {
     zoho:       { name:"Zoho CRM",   sub:"Deals, Contacts, Tasks", icon:"📊", oauth:true  },
     hubspot:    { name:"HubSpot",    sub:"Deals, Contacts",        icon:"🟠", oauth:false },
@@ -314,43 +381,18 @@
 
   function connectCRM() {
     const crm   = document.getElementById("crm").value;
-    const email = getEmail();
+    const email = getUser()?.email;
     if (crm === "zoho") window.location.href = `${BACKEND}/auth/zoho?email=${enc(email)}`;
-  }
-
-  function onLLMChange() {
-    const v = document.getElementById("llm").value;
-    document.getElementById("f-openai").style.display = v === "openai" ? "" : "none";
-    document.getElementById("f-claude").style.display = v === "claude" ? "" : "none";
-  }
-
-  // ── Show/hide ─────────────────────────────────────────
-  function showLogin() {
-    document.getElementById("login").style.display = "";
-    document.getElementById("app").style.display   = "none";
-  }
-
-  function showApp(s) {
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display   = "";
-    document.getElementById("uEmail").textContent  = s.email;
-    if (s.founder_email) document.getElementById("founder_email").value = s.founder_email;
-    if (s.llm)           { document.getElementById("llm").value = s.llm; onLLMChange(); }
-    if (s.crm)           { document.getElementById("crm").value = s.crm; onCRMChange(); }
-    if (s.zoho_connected) {
-      const b = document.getElementById("crmBtn");
-      b.className = "tag connected"; b.textContent = "✓ Connected"; b.onclick = null;
-    }
   }
 
   // ── Settings ──────────────────────────────────────────
   async function saveSettings() {
-    const email = getEmail();
-    const body = {
-      llm:                       document.getElementById("llm").value,
+    const u     = getUser();
+    const email = u?.email;
+    const body  = {
+      llm:                       "openai",
       crm:                       document.getElementById("crm").value,
-      openai_api_key:            document.getElementById("openai_key").value,
-      anthropic_api_key:         document.getElementById("anthropic_key").value,
+      openai_api_key:            u?.openai_key || "",
       hubspot_api_key:           document.getElementById("hubspot_api_key").value,
       salesforce_username:       document.getElementById("sf_user").value,
       salesforce_password:       document.getElementById("sf_pass").value,
@@ -365,7 +407,7 @@
 
   // ── Run ───────────────────────────────────────────────
   async function runAgent() {
-    const email = getEmail();
+    const email = getUser()?.email;
     const btn   = document.getElementById("runBtn");
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Running...';
@@ -399,8 +441,6 @@
   }
 
   // ── Helpers ───────────────────────────────────────────
-  const enc = e => encodeURIComponent(e);
-
   async function apiFetch(path, method = "GET", body = null) {
     try {
       const opts = { method, headers: {} };
@@ -419,6 +459,8 @@
   function copyReport() {
     navigator.clipboard.writeText(document.getElementById("reportText").textContent);
   }
+
+  boot();
 </script>
 </body>
 </html>
