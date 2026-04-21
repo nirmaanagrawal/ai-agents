@@ -258,13 +258,16 @@
   const clearEmail= () => localStorage.removeItem("wb_email");
 
   // ── Boot ─────────────────────────────────────────────
-  (async function boot() {
-    // Handle OAuth return
+  async function boot() {
+    // Handle OAuth return — must happen before anything else
     const p = new URLSearchParams(window.location.search);
     const s = p.get("session");
     if (s) {
       setEmail(decodeURIComponent(s));
-      window.history.replaceState({}, "", "/");
+      // Clean URL then reload so boot runs fresh without params
+      window.history.replaceState({}, "", window.location.pathname);
+      location.reload();
+      return;
     }
 
     const email = getEmail();
@@ -273,7 +276,9 @@
     const status = await apiFetch(`/status?email=${enc(email)}`);
     if (status?.logged_in) showApp(status);
     else { clearEmail(); showLogin(); }
-  })();
+  }
+
+  boot();
 
   // ── Auth ─────────────────────────────────────────────
   function signInGoogle() {
