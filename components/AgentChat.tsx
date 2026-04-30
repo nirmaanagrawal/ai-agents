@@ -124,6 +124,14 @@ interface ErrorMessage {
 
 type Message = UserMessage | GreetingMessage | ThinkingMessage | ResultMessage | ErrorMessage;
 
+/**
+ * Next.js `basePath` does NOT auto-prefix raw `fetch()` calls — only Link,
+ * Image, and router.push. We expose the value as a NEXT_PUBLIC env at build
+ * time (see next.config.mjs) and prepend it manually below. Empty string
+ * fallback keeps local dev working when running without a basePath.
+ */
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
 // ---------------------------------------------------------------------------
 // Top-level component
 // ---------------------------------------------------------------------------
@@ -342,7 +350,7 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
     abortRef.current = controller;
 
     try {
-      const response = await fetch(`/api/agents/${selectedAgent.slug}/process`, {
+      const response = await fetch(`${BASE_PATH}/api/agents/${selectedAgent.slug}/process`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
@@ -429,7 +437,7 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
       const sessionId = msg.sessionId;
 
       try {
-        const response = await fetch(`/api/agents/${slug}/unlock`, {
+        const response = await fetch(`${BASE_PATH}/api/agents/${slug}/unlock`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId, ...values }),
