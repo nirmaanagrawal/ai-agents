@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * BeanbagFooter — mirrors the footer on www.beanbag.ai exactly.
  *
@@ -5,32 +7,37 @@
  * brand-specific dark palette values (#030014, #7C3AED, #22D3EE)
  * that aren't in the Tailwind config. All links point to the
  * main beanbag.ai domain since this is a subdomain app.
+ *
+ * 'use client' is required because the link rows use onMouseEnter /
+ * onMouseLeave handlers for the brand hover color shift. Without the
+ * directive Next.js can't prerender the page (event handlers aren't
+ * serializable across the server→client boundary).
  */
 
 const currentYear = new Date().getFullYear();
 
 const LINKS = {
   solutions: [
-    { label: 'Strategic AI Consulting', href: 'https://beanbag.ai/solutions/strategic-consulting' },
-    { label: 'GenAI & LLM Engineering',  href: 'https://beanbag.ai/solutions/genai-engineering' },
-    { label: 'Intelligent Agents',        href: 'https://beanbag.ai/solutions/intelligent-agents' },
-    { label: 'Data Engineering',          href: 'https://beanbag.ai/solutions/data-engineering' },
+    { label: 'Strategic AI Consulting', href: 'https://www.beanbag.ai/solutions/strategic-consulting' },
+    { label: 'GenAI & LLM Engineering',  href: 'https://www.beanbag.ai/solutions/genai-engineering' },
+    { label: 'Intelligent Agents',        href: 'https://www.beanbag.ai/solutions/intelligent-agents' },
+    { label: 'Data Engineering',          href: 'https://www.beanbag.ai/solutions/data-engineering' },
   ],
   industries: [
-    { label: 'Healthcare',          href: 'https://beanbag.ai/#industries' },
-    { label: 'Banking & FinTech',   href: 'https://beanbag.ai/#industries' },
-    { label: 'Retail & E-Commerce', href: 'https://beanbag.ai/#industries' },
-    { label: 'Manufacturing',       href: 'https://beanbag.ai/#industries' },
+    { label: 'Healthcare',          href: 'https://www.beanbag.ai/#industries' },
+    { label: 'Banking & FinTech',   href: 'https://www.beanbag.ai/#industries' },
+    { label: 'Retail & E-Commerce', href: 'https://www.beanbag.ai/#industries' },
+    { label: 'Manufacturing',       href: 'https://www.beanbag.ai/#industries' },
   ],
   resources: [
-    { label: 'Blog',          href: 'https://beanbag.ai/blog' },
-    { label: 'Case Studies',  href: 'https://beanbag.ai/case-studies' },
-    { label: 'Templates',     href: 'https://beanbag.ai/templates' },
-    { label: 'Tools',         href: 'https://beanbag.ai/tools' },
+    { label: 'Blog',          href: 'https://www.beanbag.ai/blog' },
+    { label: 'Case Studies',  href: 'https://www.beanbag.ai/case-studies' },
+    { label: 'Templates',     href: 'https://www.beanbag.ai/templates' },
+    { label: 'Tools',         href: 'https://www.beanbag.ai/tools' },
   ],
   company: [
-    { label: 'Privacy Policy',    href: 'https://beanbag.ai/privacyPolicy' },
-    { label: 'Terms of Service',  href: 'https://beanbag.ai/termsofuse' },
+    { label: 'Privacy Policy',    href: 'https://www.beanbag.ai/privacyPolicy' },
+    { label: 'Terms of Service',  href: 'https://www.beanbag.ai/termsofuse' },
   ],
 };
 
@@ -88,7 +95,7 @@ const ColHead = ({ children }: { children: React.ReactNode }) => (
 const FooterLink = ({ href, label }: { href: string; label: string }) => (
   <a
     href={href}
-    target={href.startsWith('https://beanbag.ai') ? '_blank' : undefined}
+    target={href.startsWith('https://www.beanbag.ai') ? '_blank' : undefined}
     rel="noreferrer"
     className="mb-2.5 block text-sm transition-colors duration-200"
     style={{ color: 'rgba(255,255,255,0.6)' }}
@@ -115,7 +122,7 @@ export default function BeanbagFooter() {
 
           {/* ── Col 1: Logo + tagline + socials ── */}
           <div className="col-span-2 md:col-span-3">
-            <a href="https://beanbag.ai" target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2">
+            <a href="https://www.beanbag.ai" target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/beanbag-logo.png" alt="Beanbag AI" className="h-8 w-8 object-contain" />
               <span className="text-base font-semibold text-white">Beanbag AI</span>

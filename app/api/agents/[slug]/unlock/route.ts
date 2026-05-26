@@ -25,12 +25,12 @@ interface StoredSession {
   teaser: unknown;
   remaining: number;
   gated: boolean;
-  /** Level-2/3 agents store their flat tool-call trace alongside the result
-   *  so the unlocked view can render "agent made N tool calls" proof-of-work. */
+  /** Flat tool-call trace, surfaced to the UI so the visitor sees
+   *  what tools the agent invoked. */
   toolTrace?: unknown;
-  /** Level-3 agents also store the per-step workflow trace so the unlocked
-   *  view can render the full step timeline. */
-  workflowTrace?: unknown;
+  /** Per-turn timeline (one entry per assistant turn). Replaces the
+   *  earlier workflow-step trace. */
+  turnTrace?: unknown;
 }
 
 export async function POST(
@@ -120,13 +120,13 @@ export async function POST(
   }
 
   // --- Return the full result + traces -----------------------------------
-  // Both traces (flat tool calls and per-step workflow timeline) are part
-  // of the unlocked experience — the visitor traded an email to see the
-  // agent's full work, including which steps were skipped and why.
+  // Both traces (flat tool calls and per-turn timeline) are part of the
+  // unlocked experience — the visitor traded an email to see the agent's
+  // full reasoning trail.
   return NextResponse.json({
     unlocked: true,
     toolTrace: session.toolTrace ?? [],
-    workflowTrace: session.workflowTrace ?? [],
+    turnTrace: session.turnTrace ?? [],
     result: session.full,
   });
 }

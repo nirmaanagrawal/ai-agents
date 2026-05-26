@@ -1,14 +1,14 @@
 /**
- * Per-agent deep-link page.
+ * Per-agent chat page.
  *
- * Renders the same chat surface as `/`, but with the dropdown
- * pre-selected to the URL slug. Lets us preserve shareable links
- * (e.g. `/agents/lead-qualifier`) and embeddable URLs without a
- * second UI to maintain.
+ * Visitors land here from the marketplace grid (or via direct link).
+ * The chat is locked to this specific agent: no dropdown, just a
+ * "Back to marketplace" link in the header so visitors who want a
+ * different agent navigate back to the grid (which is the canonical
+ * picker now).
  *
  * Returns 404 when the slug isn't registered. Pre-rendered at build
- * time via `generateStaticParams` so each agent's landing page is
- * static + fast.
+ * time via `generateStaticParams` so each agent's page is static + fast.
  */
 import { notFound } from 'next/navigation';
 import AgentChat from '@/components/AgentChat';
@@ -23,8 +23,20 @@ export default async function AgentPage({
   const { slug } = await params;
   if (!getAgent(slug)) notFound();
 
-  const agents = listAgents().map(toPublicConfig);
-  return <AgentChat agents={agents} initialAgentSlug={slug} />;
+  // Pass only the locked agent in the array — the chat hides the
+  // switcher when locked, but the prop shape stays the same so we
+  // don't fork the component for one-agent vs many-agent mode.
+  const allAgents = listAgents().map(toPublicConfig);
+  const lockedAgent = allAgents.find((a) => a.slug === slug);
+  if (!lockedAgent) notFound();
+
+  return (
+    <AgentChat
+      agents={[lockedAgent]}
+      initialAgentSlug={slug}
+      lockedToAgent
+    />
+  );
 }
 
 export async function generateStaticParams() {

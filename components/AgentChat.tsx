@@ -55,13 +55,35 @@ import {
   GateForm,
   ResultsBody,
   ToolTraceView,
-  WorkflowTraceView,
+  AgentTurnTraceView,
 } from './agent-renderers';
+import IcpWizard from './IcpWizard';
+import { churnRiskWizard } from '@/lib/wizard/churn-risk';
+import { buildDynamicWizard } from '@/lib/wizard/dynamic';
+import { gccProspectorWizard } from '@/lib/wizard/gcc-prospector';
+import { leadQualifierWizard } from '@/lib/wizard/lead-qualifier';
+import { salesProposalWizard } from '@/lib/wizard/sales-proposal';
+import { vendorEvaluatorWizard } from '@/lib/wizard/vendor-evaluator';
+import type { Question, WizardDefinition } from '@/lib/wizard/types';
 import type {
   PublicAgentConfig,
   ToolCallRecord,
-  WorkflowStepRecord,
+  AgentTurnRecord,
 } from '@/lib/agents/types';
+
+/**
+ * Per-agent decision: which slug uses which wizard. Keeping this in a
+ * single map (vs. a config flag on AgentConfig) means adding a wizard
+ * to a new agent is a one-line change here — no churn on the server
+ * registry.
+ */
+const AGENT_WIZARDS: Record<string, WizardDefinition> = {
+  'lead-qualifier': leadQualifierWizard,
+  'gcc-prospector': gccProspectorWizard,
+  'vendor-evaluator': vendorEvaluatorWizard,
+  'churn-risk': churnRiskWizard,
+  'sales-proposal': salesProposalWizard,
+};
 
 // ---------------------------------------------------------------------------
 // Message types — discriminated union
@@ -97,7 +119,7 @@ interface ResultMessage {
   agentSlug: string;
   result: Record<string, unknown>;
   toolTrace: ToolCallRecord[];
-  workflowTrace: WorkflowStepRecord[];
+  turnTrace: AgentTurnRecord[];
   gated: boolean;
   remaining: number;
   sessionId: string;
@@ -118,7 +140,7 @@ interface ErrorMessage {
   text: string;
   /** Partial traces returned by the route on failure — useful for showing
    *  "step 3 failed: …" rather than a bare error line. */
-  workflowTrace?: WorkflowStepRecord[];
+  turnTrace?: AgentTurnRecord[];
   toolTrace?: ToolCallRecord[];
 }
 
@@ -140,9 +162,16 @@ export interface AgentChatProps {
   agents: PublicAgentConfig[];
   /** Optional initial agent (e.g., from URL `/agents/[slug]`). */
   initialAgentSlug?: string;
+  /**
+   * When true, the agent-switcher dropdown is hidden and the header
+   * shows a "Back to marketplace" link instead. Use this on the
+   * `/agents/[slug]` page where the URL already specifies which
+   * agent is in focus.
+   */
+  lockedToAgent?: boolean;
 }
 
-export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) {
+export default function AgentChat({ agents, initialAgentSlug, lockedToAgent }: AgentChatProps) {
   // The agent the dropdown currently points at — drives the greeting and
   // composer slots. Defaults to the URL slug if valid, else the first agent.
   const [selectedSlug, setSelectedSlug] = useState<string>(() => {
@@ -161,6 +190,45 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
   const [composerText, setComposerText] = useState('');
   const [composerFiles, setComposerFiles] = useState<Record<string, File[]>>({});
 
+  // Wizard state — when the visitor lands on an agent that has a
+  // registered wizard, it runs in place of the composer until completion.
+  // After completion, `wizardIcp` holds the structured ICP block and the
+  // composer becomes available (pre-filled).
+  const [wizardIcp, setWizardIcp] = useState<string | null>(null);
+  const [wizardSkipped, setWizardSkipped] = useState(false);
+
+  // Dynamic-wizard state — for agents with `dynamicWizard` config
+  // (e.g., Resume Screener). The visitor uploads ONE trigger file
+  // first; the server analyzes it and returns a custom wizard, which
+  // we then render via the same IcpWizard component as the preset
+  // wizards.
+  const [dynamicWizard, setDynamicWizard] = useState<WizardDefinition | null>(null);
+  const [dynamicWizardBuilding, setDynamicWizardBuilding] = useState(false);
+  const [dynamicWizardError, setDynamicWizardError] = useState<string | null>(null);
+
+  const isDynamicWizardAgent = !!selectedAgent?.dynamicWizard;
+  const triggerSlot = selectedAgent?.dynamicWizard?.triggerSlot ?? null;
+  const triggerSlotHasFile =
+    triggerSlot != null && (composerFiles[triggerSlot]?.length ?? 0) > 0;
+
+  // For dynamic-wizard agents, the "wizard to render" is whichever
+  // the server returned (or null if not built yet). For preset agents,
+  // it's the static one looked up from AGENT_WIZARDS.
+  const activeWizard: WizardDefinition | undefined = isDynamicWizardAgent
+    ? (dynamicWizard ?? undefined)
+    : selectedAgent
+      ? AGENT_WIZARDS[selectedAgent.slug]
+      : undefined;
+
+  const showWizard = !!activeWizard && wizardIcp === null && !wizardSkipped;
+
+  // "Pre-build" stage for dynamic-wizard agents: the visitor hasn't
+  // uploaded the trigger file yet (or has uploaded but not built
+  // the wizard). In this stage we suppress the regular Composer and
+  // show a focused upload panel inline in the chat.
+  const showDynamicTriggerStage =
+    isDynamicWizardAgent && !activeWizard && !wizardIcp;
+
   // Conversation transcript. Grows append-only; we never edit prior
   // messages except to mutate the gate state on a Result message in-place.
   const [messages, setMessages] = useState<Message[]>([]);
@@ -171,30 +239,17 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
   const [isProcessing, setIsProcessing] = useState(false);
 
   // ----- Agent switching --------------------------------------------------
-  // When the dropdown changes, reset the conversation. If the visitor has
-  // a real conversation in progress, confirm before nuking it.
+  // When the dropdown changes, reset the conversation immediately. We used
+  // to gate this on a `confirm()` popup when the chat had user messages,
+  // but that turned out to be the wrong UX: visitors often try a tool by
+  // accident (or hit an error) and want to switch without acknowledging a
+  // popup. The chat content is cheap to regenerate, so just swap silently.
   const handleAgentChange = useCallback(
     (newSlug: string) => {
       if (newSlug === selectedSlug) return;
-      // "Real conversation" = anything past the initial greeting OR composer
-      // already partly filled. Empty greeting → just swap.
-      const hasUserMessages = messages.some((m) => m.role === 'user');
-      const hasStaged =
-        composerText.trim().length > 0 ||
-        Object.values(composerFiles).some((arr) => arr.length > 0);
-      if (hasUserMessages || hasStaged) {
-        const target = agents.find((a) => a.slug === newSlug);
-        if (
-          !window.confirm(
-            `Start a new conversation with ${target?.name ?? newSlug}? Your current chat will be cleared.`,
-          )
-        ) {
-          return;
-        }
-      }
       setSelectedSlug(newSlug);
     },
-    [selectedSlug, messages, composerText, composerFiles, agents],
+    [selectedSlug],
   );
 
   // Whenever the selected agent changes, reset the conversation and stage.
@@ -215,6 +270,11 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
     ]);
     setComposerText('');
     setComposerFiles({});
+    setWizardIcp(null);
+    setWizardSkipped(false);
+    setDynamicWizard(null);
+    setDynamicWizardBuilding(false);
+    setDynamicWizardError(null);
     abortRef.current?.abort();
     abortRef.current = null;
     setIsProcessing(false);
@@ -277,6 +337,48 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
     },
     [selectedAgent, isProcessing, addFilesToSlot],
   );
+
+  // ----- Build dynamic wizard from the trigger file -----------------------
+  const buildDynamicWizardFromFile = useCallback(async () => {
+    if (!selectedAgent || !triggerSlot || isProcessing || dynamicWizardBuilding) return;
+    const triggerFile = composerFiles[triggerSlot]?.[0];
+    if (!triggerFile) return;
+
+    setDynamicWizardBuilding(true);
+    setDynamicWizardError(null);
+
+    const formData = new FormData();
+    formData.append(triggerSlot, triggerFile);
+
+    try {
+      const response = await fetch(
+        `${BASE_PATH}/api/agents/${selectedAgent.slug}/build-wizard`,
+        { method: 'POST', body: formData },
+      );
+      const body = (await safeJson(response)) as
+        | { wizard?: { title?: string; questions: Question[] }; error?: string }
+        | null;
+      if (!response.ok || !body?.wizard) {
+        throw new Error(body?.error ?? `Wizard build failed (${response.status})`);
+      }
+      setDynamicWizard(
+        buildDynamicWizard(
+          { title: body.wizard.title, questions: body.wizard.questions },
+          'Screening criteria',
+        ),
+      );
+    } catch (error) {
+      setDynamicWizardError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDynamicWizardBuilding(false);
+    }
+  }, [
+    selectedAgent,
+    triggerSlot,
+    composerFiles,
+    isProcessing,
+    dynamicWizardBuilding,
+  ]);
 
   // ----- Send → POST /process ---------------------------------------------
   const send = useCallback(async () => {
@@ -362,7 +464,7 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
             remaining?: number;
             gated?: boolean;
             toolTrace?: ToolCallRecord[];
-            workflowTrace?: WorkflowStepRecord[];
+            turnTrace?: AgentTurnRecord[];
             error?: string;
           }
         | null;
@@ -373,7 +475,7 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
           role: 'assistant',
           kind: 'error',
           text: body?.error ?? `Processing failed (${response.status})`,
-          workflowTrace: body?.workflowTrace,
+          turnTrace: body?.turnTrace,
           toolTrace: body?.toolTrace,
         });
         return;
@@ -395,7 +497,7 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
         agentSlug: selectedAgent.slug,
         result: body.teaser,
         toolTrace: body.toolTrace ?? [],
-        workflowTrace: body.workflowTrace ?? [],
+        turnTrace: body.turnTrace ?? [],
         gated: Boolean(body.gated),
         remaining: body.remaining ?? 0,
         sessionId: body.sessionId ?? '',
@@ -449,7 +551,7 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
         const data = (await response.json()) as {
           result: Record<string, unknown>;
           toolTrace?: ToolCallRecord[];
-          workflowTrace?: WorkflowStepRecord[];
+          turnTrace?: AgentTurnRecord[];
         };
         setMessages((prev) =>
           prev.map((m) =>
@@ -458,9 +560,9 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
                   ...m,
                   result: data.result,
                   toolTrace: Array.isArray(data.toolTrace) ? data.toolTrace : m.toolTrace,
-                  workflowTrace: Array.isArray(data.workflowTrace)
-                    ? data.workflowTrace
-                    : m.workflowTrace,
+                  turnTrace: Array.isArray(data.turnTrace)
+                    ? data.turnTrace
+                    : m.turnTrace,
                   unlocked: true,
                   unlockBusy: false,
                 }
@@ -509,26 +611,28 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
   // ----- Render -----------------------------------------------------------
   if (!selectedAgent) {
     return (
-      <div className="flex h-screen items-center justify-center text-gray-500">
+      <div className="flex h-screen items-center justify-center text-ink-500">
         No agents available.
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="flex h-screen flex-col bg-cream-100">
+      <BrandBar />
       <Header
         agents={agents}
         selected={selectedAgent}
         onSelect={handleAgentChange}
         disabled={isProcessing}
+        lockedToAgent={!!lockedToAgent}
       />
 
       <div
         ref={scrollerRef}
         className="flex-1 overflow-y-auto"
         onDragOver={(e) => e.preventDefault()}
-        onDrop={onComposerDrop}
+        onDrop={showWizard || showDynamicTriggerStage ? undefined : onComposerDrop}
       >
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
           {messages.map((m) => (
@@ -539,20 +643,112 @@ export default function AgentChat({ agents, initialAgentSlug }: AgentChatProps) 
               onUnlock={(values) => unlockMessage(m.id, values)}
             />
           ))}
+
+          {/* Stage A/B/C — dynamic-wizard agents pre-wizard-build */}
+          {showDynamicTriggerStage && triggerSlot && (
+            <DynamicWizardTrigger
+              agent={selectedAgent}
+              triggerSlotKey={triggerSlot}
+              files={composerFiles}
+              onAddFiles={(files) => addFilesToSlot(triggerSlot, files)}
+              onRemoveFile={(filename) => removeFile(triggerSlot, filename)}
+              onBuildWizard={buildDynamicWizardFromFile}
+              building={dynamicWizardBuilding}
+              error={dynamicWizardError}
+              triggerHasFile={triggerSlotHasFile}
+            />
+          )}
+
+          {/* Stage D — wizard rendering (preset or dynamic) */}
+          {showWizard && activeWizard && (
+            <IcpWizard
+              wizard={activeWizard}
+              onComplete={(icpText) => {
+                setWizardIcp(icpText);
+                setComposerText(icpText);
+              }}
+              // For dynamic-wizard agents we don't offer a "type
+              // freely instead" escape — the whole point is the
+              // questions came from the file.
+              onSkipWizard={
+                isDynamicWizardAgent ? undefined : () => setWizardSkipped(true)
+              }
+            />
+          )}
         </div>
       </div>
 
-      <Composer
-        agent={selectedAgent}
-        text={composerText}
-        files={composerFiles}
-        canSend={canSend}
-        isProcessing={isProcessing}
-        onTextChange={setComposerText}
-        onAddFiles={addFilesToSlot}
-        onRemoveFile={removeFile}
-        onSend={send}
-      />
+      {/* Composer hidden until the wizard (if any) is past. For
+          dynamic-wizard agents, also hidden in the pre-build stages —
+          DynamicWizardTrigger handles the upload UI there. */}
+      {!showWizard && !showDynamicTriggerStage && (
+        <Composer
+          agent={selectedAgent}
+          text={composerText}
+          files={composerFiles}
+          canSend={canSend}
+          isProcessing={isProcessing}
+          onTextChange={setComposerText}
+          onAddFiles={addFilesToSlot}
+          onRemoveFile={removeFile}
+          onSend={send}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Brand bar — Beanbag AI logo + name on a dark band
+// ---------------------------------------------------------------------------
+
+/**
+ * Top-of-page brand strip. Sits above the agent dropdown so visitors
+ * land on a "Beanbag AI" page first, not a generic agent picker.
+ *
+ * Dark background by design: the live Beanbag logo is an orange-to-red
+ * bean shape, which pops on near-black but disappears on white. Text is
+ * white for the same reason — high contrast against the dark band.
+ *
+ * The logo file is bundled in /public and served from `${BASE_PATH}/...`
+ * because Next.js's `basePath` setting does NOT auto-prefix `<img src>`
+ * the way it does for `<Link>` / `next/image`. Explicit prefix is safer
+ * than discovering the asset 404'd in production.
+ */
+function BrandBar() {
+  return (
+    <div className="border-b border-cream-200 bg-cream-50/80 backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-3.5">
+        {/* Logo + wordmark — clickable cluster routes back to the
+            marketplace grid. Matches the brand bar on the landing
+            page so visitors learn one navigation pattern. */}
+        <a
+          href={`${BASE_PATH}/`}
+          className="group flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+          aria-label="Back to marketplace"
+        >
+          {/*  eslint-disable-next-line @next/next/no-img-element  */}
+          <img
+            src={`${BASE_PATH}/beanbag-logo.png`}
+            alt="Beanbag AI"
+            className="h-7 w-7 shrink-0 object-contain transition-transform group-hover:scale-105"
+          />
+          <span className="text-sm font-semibold tracking-tight text-ink-900 transition-colors group-hover:text-brand-600">
+            Beanbag AI
+          </span>
+          <span className="hidden text-xs text-ink-500 sm:inline">
+            · Agent marketplace
+          </span>
+        </a>
+        <a
+          href="https://www.beanbag.ai"
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs font-medium text-ink-700 transition-colors hover:text-brand-600"
+        >
+          beanbag.ai ↗
+        </a>
+      </div>
     </div>
   );
 }
@@ -566,39 +762,57 @@ function Header({
   selected,
   onSelect,
   disabled,
+  lockedToAgent,
 }: {
   agents: PublicAgentConfig[];
   selected: PublicAgentConfig;
   onSelect: (slug: string) => void;
   disabled: boolean;
+  lockedToAgent: boolean;
 }) {
   return (
-    <header className="border-b bg-white">
-      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="text-2xl leading-none">{selected.icon}</span>
+    <header className="border-b border-cream-200 bg-white">
+      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-4">
+        <div className="flex min-w-0 items-center gap-3.5">
+          {/* Icon tile — matches the marketplace card treatment so
+              visitors see continuity from the grid into the agent. */}
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 text-xl ring-1 ring-inset ring-brand-200/60">
+            {selected.icon}
+          </div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold text-gray-900">
+            <h1 className="truncate font-serif text-lg font-semibold leading-tight text-ink-900">
               {selected.name}
             </h1>
-            <p className="truncate text-xs text-gray-500">{selected.description}</p>
+            <p className="truncate text-xs leading-snug text-ink-500">
+              {selected.description}
+            </p>
           </div>
         </div>
-        <label className="flex shrink-0 items-center gap-2 text-sm">
-          <span className="hidden text-gray-500 sm:inline">Agent:</span>
-          <select
-            value={selected.slug}
-            onChange={(e) => onSelect(e.target.value)}
-            disabled={disabled}
-            className="rounded-lg border bg-white px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        {lockedToAgent ? (
+          <a
+            href={`${BASE_PATH}/`}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 transition-all hover:border-brand-300 hover:text-brand-600 hover:shadow-sm"
           >
-            {agents.map((a) => (
-              <option key={a.slug} value={a.slug}>
-                {a.icon} {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            <span aria-hidden>←</span>
+            <span>All agents</span>
+          </a>
+        ) : (
+          <label className="flex shrink-0 items-center gap-2 text-sm">
+            <span className="hidden text-ink-500 sm:inline">Agent:</span>
+            <select
+              value={selected.slug}
+              onChange={(e) => onSelect(e.target.value)}
+              disabled={disabled}
+              className="rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {agents.map((a) => (
+                <option key={a.slug} value={a.slug}>
+                  {a.icon} {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
     </header>
   );
@@ -639,7 +853,7 @@ function MessageRow({
 
 function Avatar({ emoji }: { emoji: string }) {
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-base text-white shadow-sm">
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-base text-white shadow-brand-cta ring-2 ring-white">
       {emoji}
     </div>
   );
@@ -648,74 +862,95 @@ function Avatar({ emoji }: { emoji: string }) {
 function UserMessageView({ message }: { message: UserMessage }) {
   return (
     <div className="flex items-start justify-end gap-3">
-      <div className="max-w-[85%] space-y-1">
+      <div className="max-w-[85%] space-y-1.5">
         {message.attachments.length > 0 && (
           <div className="flex flex-wrap justify-end gap-1">
             {message.attachments.flatMap((a) =>
               a.filenames.map((name) => (
                 <span
                   key={`${a.slotKey}-${name}`}
-                  className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs text-indigo-800"
+                  className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700"
                   title={`${a.slotLabel}: ${name}`}
                 >
-                  📎 {name}
+                  <span className="text-brand-500">📎</span>
+                  <span className="max-w-[200px] truncate">{name}</span>
                 </span>
               )),
             )}
           </div>
         )}
         {message.text && (
-          <div className="rounded-2xl rounded-tr-sm bg-indigo-600 px-4 py-2 text-sm text-white shadow-sm">
+          <div className="rounded-2xl rounded-tr-md bg-brand-gradient px-4 py-2.5 text-sm leading-relaxed text-white shadow-brand-cta">
             {message.text}
           </div>
         )}
       </div>
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm text-gray-700">
-        👤
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-200 text-sm font-medium text-ink-700 ring-2 ring-white">
+        you
       </div>
     </div>
   );
 }
 
 function GreetingView({ agent }: { agent: PublicAgentConfig }) {
-  // Auto-derived from config — keeps each agent's tone consistent without
-  // requiring a hand-written greeting per agent.
+  // Auto-derived from config — keeps each agent's tone consistent
+  // across the marketplace without per-agent hand-written copy.
   const slotsList = agent.fileSlots.map((s) => s.label.toLowerCase());
   const slotsClause =
-    slotsList.length === 1
-      ? `your ${slotsList[0]}`
-      : slotsList.length === 2
-        ? `your ${slotsList[0]} and your ${slotsList[1]}`
-        : slotsList.slice(0, -1).join(', ') + ', and ' + slotsList[slotsList.length - 1];
+    slotsList.length === 0
+      ? ''
+      : slotsList.length === 1
+        ? `your ${slotsList[0]}`
+        : slotsList.length === 2
+          ? `your ${slotsList[0]} and your ${slotsList[1]}`
+          : slotsList.slice(0, -1).join(', ') +
+            ', and ' +
+            slotsList[slotsList.length - 1];
   const ctx = agent.contextInput?.label.toLowerCase();
-  const ctxClause = ctx
-    ? agent.contextInput!.required
-      ? ` and tell me about ${ctx}`
-      : ` (optionally tell me about ${ctx} for sharper results)`
-    : '';
+  const isDynamicWizard = !!agent.dynamicWizard;
+
+  let actionLine: string;
+  if (isDynamicWizard && slotsList.length > 0) {
+    const triggerSlotLabel =
+      agent.fileSlots
+        .find((s) => s.key === agent.dynamicWizard?.triggerSlot)
+        ?.label.toLowerCase() ?? slotsList[0];
+    actionLine = `Drop the ${triggerSlotLabel} below — I'll read it and build the screening questions tailored to it.`;
+  } else if (ctx && slotsList.length > 0) {
+    actionLine = agent.contextInput?.required
+      ? `Walk through the short wizard, then attach ${slotsClause}.`
+      : `Attach ${slotsClause} (and add ${ctx} if you have it for sharper results).`;
+  } else if (ctx) {
+    actionLine = 'Walk through the short wizard to set things up.';
+  } else if (slotsList.length > 0) {
+    actionLine = `Attach ${slotsClause} and hit Send.`;
+  } else {
+    actionLine = 'Hit Send to begin.';
+  }
 
   return (
-    <div className="rounded-2xl rounded-tl-sm bg-white px-4 py-3 text-sm text-gray-800 shadow-sm">
-      <p>
-        Hi! I&apos;m the <strong>{agent.name}</strong>. {agent.description}
+    <div className="rounded-2xl rounded-tl-md border border-cream-200/60 bg-white px-5 py-4 shadow-brand-card">
+      <p className="text-sm leading-relaxed text-ink-900">
+        Hi — I&apos;m the{' '}
+        <strong className="font-semibold">{agent.name}</strong>. {agent.description}
       </p>
-      <p className="mt-2 text-gray-600">
-        To get started, attach {slotsClause}
-        {ctxClause}.
-      </p>
+      <p className="mt-2.5 text-sm leading-relaxed text-ink-700">{actionLine}</p>
     </div>
   );
 }
 
 function ThinkingView({ startedAt }: { startedAt: number }) {
   // Cycle through friendly status lines while the request is in flight.
-  // This is theatre — we don't have streaming progress — but it's better
-  // than a static "loading" for a 30-60s call.
+  // We rotate slower than the actual phase boundaries because we don't
+  // have streaming progress — the stages are theatre that matches the
+  // *typical* lifecycle.
   const stages = useMemo(
     () => [
-      'Reading your files…',
-      'Running the workflow steps…',
-      'Cross-referencing with live data…',
+      'Reading your inputs…',
+      'Searching the open web…',
+      'Probing careers pages…',
+      'Cross-referencing signals…',
+      'Verifying every lead…',
       'Structuring the final report…',
     ],
     [],
@@ -723,9 +958,12 @@ function ThinkingView({ startedAt }: { startedAt: number }) {
   const [idx, setIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
+    // Cycle every 12s instead of 4s — long-running discovery agents
+    // would otherwise blow through all stages in 16s and then sit on
+    // "Structuring…" for the remaining 5 minutes.
     const stage = window.setInterval(
       () => setIdx((i) => Math.min(i + 1, stages.length - 1)),
-      4000,
+      12_000,
     );
     const tick = window.setInterval(() => setElapsed(Date.now() - startedAt), 1000);
     return () => {
@@ -734,11 +972,25 @@ function ThinkingView({ startedAt }: { startedAt: number }) {
     };
   }, [stages.length, startedAt]);
 
+  const elapsedSec = Math.round(elapsed / 1000);
+  // After the 90-second mark we surface a subtle "discovery agents take
+  // a few minutes" hint so the visitor doesn't bail thinking it's hung.
+  const showLongRunningHint = elapsedSec > 90;
+
   return (
-    <div className="flex items-center gap-3 rounded-2xl rounded-tl-sm bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
-      <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-      <span>{stages[idx]}</span>
-      <span className="ml-auto text-xs text-gray-400">{Math.round(elapsed / 1000)}s</span>
+    <div className="flex flex-col gap-1 rounded-2xl rounded-tl-md border border-cream-200/60 bg-white px-5 py-4 text-sm text-ink-700 shadow-brand-card">
+      <div className="flex items-center gap-3">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <span>{stages[idx]}</span>
+        <span className="ml-auto text-xs text-ink-300">{elapsedSec}s</span>
+      </div>
+      {showLongRunningHint && (
+        <p className="ml-7 text-xs text-ink-500">
+          Discovery agents can take 3-8 minutes when verifying many
+          prospects. Hang tight — we&apos;ll show the result here when
+          ready.
+        </p>
+      )}
     </div>
   );
 }
@@ -755,11 +1007,11 @@ function ResultView({
   const showGate = message.gated && !message.unlocked;
 
   return (
-    <div className="space-y-3 rounded-2xl rounded-tl-sm bg-white px-4 py-3 shadow-sm">
-      {message.workflowTrace.length > 0 && (
-        <WorkflowTraceView trace={message.workflowTrace} />
+    <div className="space-y-4 rounded-2xl rounded-tl-md border border-cream-200/60 bg-white px-5 py-4 shadow-brand-card">
+      {message.turnTrace.length > 0 && (
+        <AgentTurnTraceView trace={message.turnTrace} />
       )}
-      {message.toolTrace.length > 0 && message.workflowTrace.length === 0 && (
+      {message.toolTrace.length > 0 && message.turnTrace.length === 0 && (
         <ToolTraceView trace={message.toolTrace} />
       )}
       <ResultsBody slug={agent.slug} result={message.result} />
@@ -791,8 +1043,8 @@ function ErrorView({ message }: { message: ErrorMessage }) {
       <div className="rounded-2xl rounded-tl-sm bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
         ⚠ {message.text}
       </div>
-      {message.workflowTrace && message.workflowTrace.length > 0 && (
-        <WorkflowTraceView trace={message.workflowTrace} />
+      {message.turnTrace && message.turnTrace.length > 0 && (
+        <AgentTurnTraceView trace={message.turnTrace} />
       )}
       {message.toolTrace && message.toolTrace.length > 0 && (
         <ToolTraceView trace={message.toolTrace} />
@@ -841,7 +1093,7 @@ function Composer({
   };
 
   return (
-    <footer className="border-t bg-white">
+    <footer className="border-t border-cream-200 bg-cream-50">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 py-3">
         {/* Per-slot file chips. We render one chip strip per slot so the
             visitor knows which file is going into which slot. */}
@@ -853,22 +1105,22 @@ function Composer({
               return (
                 <div
                   key={slot.key}
-                  className="flex flex-wrap items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1"
+                  className="flex flex-wrap items-center gap-1 rounded-lg bg-brand-50 px-2 py-1"
                 >
-                  <span className="text-xs font-medium text-indigo-700">
+                  <span className="text-xs font-medium text-brand-600">
                     {slot.label}:
                   </span>
                   {slotFiles.map((f) => (
                     <span
                       key={f.name}
-                      className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs text-gray-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs text-ink-700"
                     >
                       📎 {f.name}
                       <button
                         type="button"
                         onClick={() => onRemoveFile(slot.key, f.name)}
                         disabled={isProcessing}
-                        className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+                        className="text-ink-300 hover:text-red-500 disabled:opacity-50"
                         aria-label={`Remove ${f.name}`}
                       >
                         ×
@@ -904,20 +1156,20 @@ function Composer({
             disabled={isProcessing}
             placeholder={placeholder}
             rows={2}
-            className="min-h-[44px] flex-1 resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50"
+            className="min-h-[44px] flex-1 resize-none rounded-xl border border-cream-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-cream-100"
           />
 
           <button
             type="button"
             onClick={onSend}
             disabled={!canSend}
-            className="h-[44px] shrink-0 rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+            className="h-[44px] shrink-0 rounded-xl bg-brand-gradient px-5 text-sm font-semibold text-white shadow-brand-cta transition-all hover:-translate-y-0.5 hover:shadow-brand-cta-hover active:translate-y-0 disabled:cursor-not-allowed disabled:bg-none disabled:bg-ink-300 disabled:shadow-none disabled:hover:translate-y-0"
           >
             Send
           </button>
         </div>
 
-        <p className="text-center text-[11px] text-gray-400">
+        <p className="text-center text-[11px] text-ink-300">
           Drop files anywhere · Enter to send · Shift+Enter for newline
         </p>
       </div>
@@ -949,7 +1201,7 @@ function SlotAttachButton({
         onClick={() => inputRef.current?.click()}
         disabled={disabled}
         title={`Accepted: ${slot.extensions.join(', ')} · max ${slot.maxSizeMB}MB`}
-        className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-indigo-400 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center justify-center rounded-lg border border-cream-200 bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         📎 {slot.label}
       </button>
@@ -962,6 +1214,212 @@ function SlotAttachButton({
         className="hidden"
       />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DynamicWizardTrigger — pre-wizard upload UI for dynamic-wizard agents
+// ---------------------------------------------------------------------------
+
+/**
+ * Three-state inline panel for dynamic-wizard agents (Resume Screener
+ * today). Renders inside the chat thread, NOT in the composer.
+ *
+ *   State 1 — no file:      Dropzone for the trigger slot.
+ *   State 2 — file attached: "Generate criteria from this JD" CTA.
+ *   State 3 — building:     Spinner with reassuring text.
+ *
+ * Errors from the build-wizard endpoint surface as a small red
+ * banner below the CTA. The visitor can re-upload to retry.
+ */
+function DynamicWizardTrigger({
+  agent,
+  triggerSlotKey,
+  files,
+  onAddFiles,
+  onRemoveFile,
+  onBuildWizard,
+  building,
+  error,
+  triggerHasFile,
+}: {
+  agent: PublicAgentConfig;
+  triggerSlotKey: string;
+  files: Record<string, File[]>;
+  onAddFiles: (files: File[]) => void;
+  onRemoveFile: (filename: string) => void;
+  onBuildWizard: () => void;
+  building: boolean;
+  error: string | null;
+  triggerHasFile: boolean;
+}) {
+  const slot = agent.fileSlots.find((s) => s.key === triggerSlotKey);
+  if (!slot) return null;
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-brand-100 bg-white p-5 shadow-brand-card">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-brand-700">
+          Step 1 of 3
+        </p>
+        <h3 className="mt-1 font-serif text-lg font-semibold text-ink-900">
+          Upload the {slot.label.toLowerCase()} first
+        </h3>
+        <p className="mt-1 text-sm text-ink-700">
+          We&apos;ll read it and build a short set of screening questions
+          tailored to this specific role. No preset MCQs — every option
+          comes from the {slot.label.toLowerCase()} itself.
+        </p>
+      </div>
+
+      <TriggerFilePicker
+        slot={slot}
+        files={files[triggerSlotKey] ?? []}
+        onAddFiles={onAddFiles}
+        onRemoveFile={onRemoveFile}
+        disabled={building}
+      />
+
+      {building && (
+        <div className="flex items-center gap-3 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-700">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+          <span>
+            Reading the {slot.label.toLowerCase()} and building screening
+            criteria… (10-30 seconds)
+          </span>
+        </div>
+      )}
+
+      {error && !building && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          ⚠ {error}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onBuildWizard}
+        disabled={!triggerHasFile || building}
+        className="w-full rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-brand-cta transition-shadow hover:shadow-brand-cta-hover disabled:cursor-not-allowed disabled:bg-none disabled:bg-ink-300 disabled:shadow-none"
+      >
+        {building
+          ? 'Building criteria…'
+          : triggerHasFile
+            ? `Generate criteria from this ${slot.label.toLowerCase()} →`
+            : `Attach the ${slot.label.toLowerCase()} to continue`}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Click-or-drop single-file picker for the dynamic-wizard trigger slot.
+ * Lighter-weight than the Composer's SlotAttachButton because it's its
+ * own large UI surface — visitors should know exactly where to drop
+ * the JD without hunting for an attach button.
+ */
+function TriggerFilePicker({
+  slot,
+  files,
+  onAddFiles,
+  onRemoveFile,
+  disabled,
+}: {
+  slot: PublicAgentConfig['fileSlots'][number];
+  files: File[];
+  onAddFiles: (files: File[]) => void;
+  onRemoveFile: (filename: string) => void;
+  disabled: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFiles = (picked: File[]) => {
+    if (picked.length === 0) return;
+    // Single-file slot — replace if a file is already present.
+    if (files.length > 0) {
+      files.forEach((f) => onRemoveFile(f.name));
+    }
+    onAddFiles(picked.slice(0, slot.maxFiles));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => !disabled && inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (disabled) return;
+          const dropped = Array.from(e.dataTransfer.files);
+          const ok = dropped.filter((f) => {
+            const ext = '.' + (f.name.split('.').pop() ?? '').toLowerCase();
+            return slot.extensions.includes(ext);
+          });
+          handleFiles(ok);
+        }}
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors ${
+          disabled
+            ? 'cursor-not-allowed border-cream-200 bg-cream-50 opacity-60'
+            : dragOver
+              ? 'border-brand-500 bg-brand-50'
+              : files.length > 0
+                ? 'border-brand-200 bg-brand-50/30'
+                : 'border-cream-300 bg-cream-50 hover:border-brand-300'
+        }`}
+      >
+        {files.length > 0 ? (
+          <div className="flex w-full items-center justify-between gap-3 text-sm">
+            <span className="truncate text-ink-900">📄 {files[0].name}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveFile(files[0].name);
+              }}
+              disabled={disabled}
+              className="rounded px-2 py-0.5 text-xs text-ink-500 hover:bg-cream-200 hover:text-ink-900"
+              aria-label="Remove file"
+            >
+              Replace ×
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-ink-900">
+              Drop a file here or click to browse
+            </p>
+            <p className="mt-1 text-xs text-ink-500">
+              {slot.extensions.join(' · ')} · up to {slot.maxSizeMB}MB
+            </p>
+          </>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={slot.extensions.join(',')}
+        onChange={(e) => {
+          const picked = Array.from(e.target.files ?? []);
+          handleFiles(picked);
+          e.target.value = '';
+        }}
+        className="hidden"
+      />
+    </div>
   );
 }
 

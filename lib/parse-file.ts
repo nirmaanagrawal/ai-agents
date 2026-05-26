@@ -1,16 +1,22 @@
 /**
  * File parsers for uploaded files.
  *
- * Supports CSV, XLSX/XLS, and PDF. The PDF path uses `pdf-parse` via its
- * internal module (`pdf-parse/lib/pdf-parse.js`) to dodge the library's
- * top-level debug hack — its index.js reads a test fixture at import time
- * (`./test/data/05-versions-space.pdf`) and ENOENTs on Vercel. Importing
- * the inner module skips that probe and gives us the same extractor.
+ * Supports CSV, XLSX/XLS, PDF, DOCX, TXT, and Markdown.
  *
- * PDF caveat: `pdf-parse` reads *text* layers only. Scanned-image invoices
- * (no embedded text) come back as near-empty strings — add OCR (Textract /
+ *   - PDF uses `pdf-parse` via its internal module
+ *     (`pdf-parse/lib/pdf-parse.js`) to dodge the library's top-level
+ *     debug hack — index.js reads a test fixture at import time
+ *     (`./test/data/05-versions-space.pdf`) and ENOENTs on Vercel.
+ *     Importing the inner module skips that probe.
+ *   - DOCX uses `mammoth` — extracts plain text from Word documents,
+ *     handles the most common JD / resume format.
+ *   - TXT / MD are read as UTF-8 directly.
+ *
+ * PDF caveat: pdf-parse reads *text* layers only. Scanned-image PDFs
+ * (no embedded text) come back near-empty — add OCR (Textract /
  * Tesseract) as a second pass if your visitors upload scans.
  */
+import mammoth from 'mammoth';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- pdf-parse has no
@@ -40,8 +46,24 @@ export async function parseFile(file: File): Promise<ParsedInput> {
     return parsePdf(file.name, buffer);
   }
 
+  if (
+    lower.endsWith('.docx') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    return parseDocx(file.name, buffer);
+  }
+
+  if (
+    lower.endsWith('.txt') ||
+    lower.endsWith('.md') ||
+    file.type === 'text/plain' ||
+    file.type === 'text/markdown'
+  ) {
+    return parsePlainText(file.name, buffer);
+  }
+
   throw new Error(
-    `Unsupported file type: ${file.name}. Accepted: .csv, .xlsx, .xls, .pdf`,
+    `Unsupported file type: ${file.name}. Accepted: .csv, .xlsx, .xls, .pdf, .docx, .txt, .md`,
   );
 }
 
@@ -94,6 +116,47 @@ async function parsePdf(filename: string, buffer: Buffer): Promise<ParsedInput> 
       pageCount: result.numpages,
       charCount: text.length,
     },
+  };
+}
+
+/**
+ * Extract plain text from a .docx via `mammoth`. JDs and resumes are
+ * almost always Word docs in the wild; without this they'd be
+ * rejected as "unsupported".
+ */
+async function parseDocx(filename: string, buffer: Buffer): Promise<ParsedInput> {
+  const result = await mammoth.extractRawText({ buffer });
+  // Mammoth returns the full text plus any conversion messages
+  // (font fallbacks, unsupported elements). We discard the messages —
+  // they're noise for our use case — but keep the warning count in
+  // metadata so debugging is possible.
+  const text = result.value.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  if (!text) {
+    throw new Error(`${filename} has no extractable text.`);
+  }
+  return {
+    filename,
+    text,
+    metadata: {
+      charCount: text.length,
+      docxWarnings: result.messages.length,
+    },
+  };
+}
+
+/**
+ * Read a .txt / .md file as UTF-8. No transformation — the LLM
+ * handles markdown structure fine without us pre-processing.
+ */
+function parsePlainText(filename: string, buffer: Buffer): ParsedInput {
+  const text = buffer.toString('utf-8').trim();
+  if (!text) {
+    throw new Error(`${filename} is empty.`);
+  }
+  return {
+    filename,
+    text,
+    metadata: { charCount: text.length },
   };
 }
 

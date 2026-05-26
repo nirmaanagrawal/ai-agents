@@ -1,18 +1,20 @@
 /**
- * Shared types for the agent registry.
+ * Shared types for the agent registry — Agent SDK edition.
  *
- * Why a handler-per-agent (not just a prompt string):
- *   A pure prompt-based registry breaks the moment an agent needs anything
- *   beyond "stuff the file into the model." Custom pre-processing (OCR,
- *   row-grouping, multi-step chains, tool calls) is the common case, not the
- *   exception. Forcing every agent through one generic route would either (a)
- *   bloat the route with per-slug branches or (b) push complexity into prompt
- *   engineering until prompts become unmaintainable. Letting each agent own
- *   its `buildPrompt` and `teaser` keeps the generic process route tiny and
- *   each agent contained.
+ * Why a per-agent config (not just a prompt string):
+ *   Each agent has its own file inputs, context input, gate copy, system
+ *   prompt, output schema, and tool set. Centralizing this in a config
+ *   object means the API route stays generic and per-agent surface lives
+ *   in one file. Adding a new agent = create one file + register it.
+ *
+ * Agent SDK note:
+ *   Unlike our earlier Vercel-AI-SDK setup, the Agent SDK runs the
+ *   tool-use loop internally (`query()` is an async generator that
+ *   yields messages). We don't write a workflow runner ourselves — the
+ *   SDK orchestrates it. Tools are registered via an in-process MCP
+ *   server, and structured output is enforced via JSON Schema (not Zod).
  */
-import type { CoreTool, LanguageModelV1 } from 'ai';
-import type { ZodSchema } from 'zod';
+import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk';
 
 /** Accepted file constraints surfaced to both client and server. */
 export interface AcceptedFiles {
@@ -31,24 +33,20 @@ export interface AcceptedFiles {
  * Agents can declare 1+ slots (Lead Qualifier: one `leads` slot; Invoice
  * Auditor: separate `invoices` and `pos` slots). Each slot renders its own
  * dropzone, posts files under its `key` in the multipart body, and is
- * validated independently server-side. `buildPrompt` receives files grouped
- * by slot key, so per-agent prompt logic never has to guess which file is
- * which.
+ * validated independently server-side.
  */
 export interface FileSlot extends AcceptedFiles {
-  /** Form-data field name + object key passed to buildPrompt. Stable/machine. */
+  /** Form-data field name + object key passed to the agent runner. */
   key: string;
   /** Human label shown above this dropzone (e.g., "Invoice files"). */
   label: string;
-  /** If false, visitor can submit with this slot empty. Defaults to true server-side. */
+  /** If false, visitor can submit with this slot empty. Defaults to true. */
   required?: boolean;
 }
 
 /**
  * Freeform context the visitor types in before uploading (e.g., ICP for
- * Lead Qualifier, policy rules for Invoice Auditor). Declaring this per-agent
- * lets each agent ask for exactly what its prompt needs, instead of forcing
- * one generic "notes" box that agents half-ignore.
+ * Lead Qualifier, policy rules for Invoice Auditor).
  */
 export interface ContextInput {
   label: string;
@@ -73,7 +71,7 @@ export interface GateConfig {
   }>;
 }
 
-/** Parsed input the agent's buildPrompt receives. */
+/** Parsed input the agent's prompt builder receives. */
 export interface ParsedInput {
   filename: string;
   /** Plain text extracted from the file (CSV/XLSX flattened to JSON-as-text). */
@@ -83,143 +81,47 @@ export interface ParsedInput {
 }
 
 /**
- * A single tool invocation captured during the research phase. Surfaced to
- * the client so the visitor can see *what* the agent actually did — the
- * core "this isn't just a prompt wrapper" signal.
+ * One tool invocation captured during an agent run. Surfaced to the UI
+ * so the visitor can see *what* the agent actually did — proof-of-work
+ * for an autonomous agent (otherwise it's a black box).
  *
- * We intentionally store args + a short preview of the result, not the
- * entire response body. Some tools (webpage fetch, DDG related-topics list)
- * return kilobytes that nobody wants to render.
+ * For the Agent SDK we extract these from the message stream — every
+ * `assistant` message that contains a tool_use block becomes a record,
+ * paired with the matching `tool_result` block.
  */
 export interface ToolCallRecord {
   tool: string;
   args: Record<string, unknown>;
-  /** Short human-readable summary of the result. "Success: 3 topics" beats raw JSON. */
+  /** Short human-readable summary of the result. */
   summary: string;
-  /** True when the tool returned an error envelope (not a thrown exception —
-   *  those fail the whole run). Lets the UI show a muted "⚠ search failed" row. */
+  /** True when the tool returned an error envelope. */
   failed: boolean;
-  /** ms spent in execute(). Useful for both UX and future optimization. */
+  /** Wall-clock duration captured around the tool execution. */
   durationMs: number;
 }
 
-// ---------------------------------------------------------------------------
-// Workflow (Level-3 agent) primitives
-// ---------------------------------------------------------------------------
-
 /**
- * Status of a single workflow step in the trace surfaced to the UI.
+ * Lightweight per-turn marker for the UI timeline.
  *
- *   pending    — step was about to run when the workflow aborted
- *   running    — step is currently executing (only seen during streaming)
- *   completed  — step finished and updated state
- *   skipped    — step's `condition` returned false; step.run never called
- *   failed     — step threw or returned an error envelope
+ * The Agent SDK doesn't expose declarative "workflow steps" the way our
+ * old runner did, but each model turn is a meaningful boundary — we
+ * record one entry per turn so the visitor sees the agent's narration
+ * and tool fan-out as a sequence rather than a single black-box block.
  */
-export type WorkflowStepStatus =
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'skipped'
-  | 'failed';
+export type AgentTurnStatus = 'completed' | 'failed';
 
-/**
- * One entry in the workflow trace. The UI renders this as a timeline so
- * the visitor can see what the agent did, in what order, with what
- * conditional branches taken — that's the proof-of-Level-3.
- */
-export interface WorkflowStepRecord {
-  id: string;
-  name: string;
-  description?: string;
-  status: WorkflowStepStatus;
-  /** Short human-readable summary of what the step did. */
-  summary: string;
-  /** Why a step was skipped (the human reason, not the boolean). */
-  skipReason?: string;
-  /** ms spent in step.run(). 0 for skipped/failed-before-start. */
-  durationMs: number;
-  /** Anthropic token totals for this step, if it called the model. */
-  modelTokens?: number;
-  /** Tool calls made *within* this step (separate from the agent's flat
-   *  toolTrace, which aggregates across all steps). */
+export interface AgentTurnRecord {
+  /** 1-based turn index. */
+  turn: number;
+  status: AgentTurnStatus;
+  /** Free-text the assistant produced this turn (often a 1-line plan). */
+  narration?: string;
+  /** Tool calls that fired during this turn. */
   toolCalls?: ToolCallRecord[];
-}
-
-/**
- * Context handed to each workflow step's `run` function.
- *
- * Steps get the bound `model` (so they don't have to know about getModel),
- * the agent's tool registry, and helpers to record telemetry. They can
- * choose to call generateText/generateObject/anything else on the model.
- *
- * Keep this surface small. Steps that need extra capabilities (caching,
- * retries) can implement them locally — making them universal here would
- * over-fit the framework to today's two agents.
- */
-export interface WorkflowContext {
-  model: LanguageModelV1;
-  /** All tools the agent registered. Steps use the subset they need. */
-  tools: Record<string, CoreTool>;
-  /** Top-level abort propagated from the request. Honor it in long ops. */
-  abortSignal: AbortSignal;
-}
-
-/**
- * One step in an agent's workflow.
- *
- * Steps mutate state by returning a `stateDelta` (shallow-merged into the
- * running state). This keeps state changes explicit and auditable —
- * easier to reason about than free mutation of a passed-in object.
- *
- * `condition` runs *before* `run` and decides whether to skip. Skip
- * decisions are part of the trace, so visitors see "Step 4: Currency
- * conversion — skipped (no cross-currency invoices)" alongside the
- * steps that did run.
- */
-export interface WorkflowStep<TState> {
-  id: string;
-  name: string;
-  description?: string;
-  /** Returns true if the step should run. Defaults to always-run. The
-   *  string variant lets you bake the human reason into the predicate
-   *  result for the trace ("no cross-currency invoices"). */
-  condition?: (state: TState) => boolean | { run: boolean; reason?: string };
-  run: (
-    state: TState,
-    ctx: WorkflowContext,
-  ) => Promise<{
-    /** Shallow-merged into state. Use a new object — don't mutate. */
-    stateDelta?: Partial<TState>;
-    /** One-line summary shown in the trace timeline. */
-    summary: string;
-    /** Tool calls this step made, for the per-step trace + flat aggregate. */
-    toolCalls?: ToolCallRecord[];
-    /** Token usage for the step's model call(s), summed. */
-    modelTokens?: number;
-  }>;
-}
-
-/**
- * The full workflow definition for a Level-3 agent.
- *
- * `initialState(input)` seeds the state bag from parsed files + context.
- * `steps` run in order, each potentially conditional.
- * `finalize(state)` produces the schema-shaped output handed to the
- * teaser splitter and persisted in Redis.
- *
- * The framework validates `finalize`'s output against `agent.schema` so
- * a buggy step that drops fields fails loudly rather than silently.
- */
-export interface WorkflowDefinition<TState, TOutput> {
-  /** Seed the state from parsed files + visitor context. */
-  initialState: (input: {
-    files: Record<string, ParsedInput[]>;
-    context: string;
-  }) => TState;
-  steps: Array<WorkflowStep<TState>>;
-  /** Convert final state → schema-shaped output. */
-  finalize: (state: TState) => TOutput;
+  /** Wall-clock duration of this turn. */
+  durationMs: number;
+  /** Token totals for this turn, when the SDK reports them. */
+  modelTokens?: number;
 }
 
 /**
@@ -228,7 +130,6 @@ export interface WorkflowDefinition<TState, TOutput> {
  *   teaser:    what the visitor sees immediately, free
  *   remaining: integer for the `{remaining}` token in the gate message
  *   gated:     true when a gate should actually show; false bypasses it
- *              (some agents may have no meaningful paywall for small inputs)
  */
 export interface TeaserResult<TOutput> {
   teaser: Partial<TOutput> & Record<string, unknown>;
@@ -237,107 +138,119 @@ export interface TeaserResult<TOutput> {
 }
 
 /**
- * The full agent config. Generic over the Zod-inferred output type so
- * `buildPrompt` and `teaser` stay type-safe per-agent.
+ * Per-agent config consumed by the generic API route.
+ *
+ * Each agent owns:
+ *   - its system prompt (defines persona + when to use which tool),
+ *   - a function to assemble the user prompt from parsed files + context,
+ *   - the JSON Schema the model's output must conform to,
+ *   - the MCP server (built via `createSdkMcpServer`) that holds its tools,
+ *   - the list of tool names the agent is allowed to call,
+ *   - a teaser splitter that decides what's free vs. gated.
+ *
+ * The runner does NOT need to know any of this — it just calls
+ * `runAgent(config, input)` and returns whatever shape comes back.
  */
 export interface AgentConfig<TOutput = unknown> {
   slug: string;
   name: string;
   description: string;
-  /** Emoji or short text badge — we don't pull icon libraries into the bundle. */
+  /** Emoji or short text badge — keeps icon library out of the bundle. */
   icon: string;
-  category: 'sales' | 'finance' | 'operations' | 'hr' | 'marketing';
+  category:
+    | 'sales'
+    | 'finance'
+    | 'operations'
+    | 'hr'
+    | 'marketing'
+    | 'customer-success';
 
-  /**
-   * One or more named dropzones. Always an array (single-file agents use a
-   * one-element array) so the UI and route don't branch on "single vs multi
-   * slot" — everything is slot-keyed end to end.
-   */
   fileSlots: FileSlot[];
-  /** Optional freeform context (ICP, policy, instructions). Omit to skip. */
   contextInput?: ContextInput;
   gate: GateConfig;
 
   llm: {
-    /** Any Anthropic model ID available to your account. We keep this as
-     *  a plain string so you don't have to edit this union every time
-     *  Anthropic ships a new model. Verify availability with
-     *  `curl https://api.anthropic.com/v1/models -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01"`. */
+    /** Any Anthropic model ID available to your account. Plain string so
+     *  new model releases don't require a code change. */
     model: string;
-    temperature: number;
-    /** Max output tokens. Input is truncated separately in the process route. */
-    maxOutputTokens: number;
-    /**
-     * Upper bound on the research loop. Each step = one model turn, which
-     * can emit multiple parallel tool calls. 5 is plenty for small batches
-     * and caps worst-case latency at roughly model_latency × 5.
-     *
-     * Omit (or set to 1) for non-agentic single-shot runs.
-     */
-    maxSteps?: number;
+    /** Cap on the agent's tool-use loop. The Agent SDK calls this
+     *  `maxTurns`; we mirror its name to avoid translation confusion. */
+    maxTurns: number;
   };
 
-  /**
-   * Tools the agent can call. Available to:
-   *   - Level-2 agents: passed to `generateText` for autonomous tool use
-   *     during the research phase.
-   *   - Level-3 agents: any workflow step can reach into `ctx.tools` and
-   *     invoke them inside the step's own `generateText` (or call them
-   *     directly via tool.execute() for fully scripted flows).
-   *
-   * Keyed by tool name; the model uses the key verbatim. Agents without
-   * tools skip the research phase entirely.
-   */
-  tools?: Record<string, CoreTool>;
+  /** System prompt — defines persona, rules, when to use each tool. */
+  systemPrompt: string;
 
   /**
-   * Level-3 (workflow) agent definition. When present, the framework runs
-   * the workflow instead of the buildPrompt → generateText/Object pipeline.
-   * `buildPrompt` may still be exported for tests but is unused at runtime.
-   *
-   * The state generic is open-ended per agent — each agent defines what it
-   * needs to track between steps. Final `finalize(state)` must return data
-   * matching the agent's `schema`.
+   * Build the user-message body from parsed files + visitor context.
+   * Per-agent so the route never branches on slug.
    */
-  // We use a non-generic CoreTool-style wildcard for the workflow slot
-  // because each agent's state shape is unique. The agent module provides
-  // the concrete type internally; the registry only sees the AgentConfig
-  // boundary, where state is opaque.
-  workflow?: WorkflowDefinition<unknown, TOutput>;
-
-  /** Zod schema for structured output. Also used by `streamObject`. */
-  schema: ZodSchema<TOutput>;
-
-  /**
-   * Convert parsed files + visitor-supplied context into a system+user
-   * prompt pair. Required for Level-1/2 agents (single-shot or tool-using).
-   * Optional for Level-3 (workflow) agents — the workflow's `initialState`
-   * seeds inputs and steps build their own prompts as needed.
-   *
-   * The route enforces "must have buildPrompt OR workflow" at runtime.
-   */
-  buildPrompt?: (input: {
-    /**
-     * Parsed files grouped by slot key. A slot with zero files uploaded
-     * shows up as an empty array — the agent decides whether that's fatal
-     * (check `required` on the slot) or a no-op.
-     */
+  buildUserPrompt: (input: {
     files: Record<string, ParsedInput[]>;
-    /** Always a string; empty when the visitor left the context field blank. */
     context: string;
-  }) => { system: string; user: string };
+  }) => string;
 
   /**
-   * Split a validated output into what's shown free vs. what's gated behind
-   * the email form. Runs server-side before the response lands on the client.
+   * In-process MCP server holding this agent's tool set, created via
+   * `createSdkMcpServer({ name, version, tools: [...] })`.
+   * Naming the server matters — tool names visible to Claude take the
+   * form `mcp__{serverName}__{toolName}`.
+   */
+  mcpServer: McpSdkServerConfigWithInstance;
+
+  /**
+   * Names of tools (with the mcp__server__tool prefix) the agent is
+   * allowed to call. Whitelist — anything not listed cannot be called.
+   */
+  allowedTools: string[];
+
+  /**
+   * JSON Schema (NOT Zod) for the structured output the agent must
+   * produce. The Agent SDK enforces this via `outputFormat: { type:
+   * 'json_schema', schema }`. Failing schema validation triggers a
+   * retry, then a hard error.
+   */
+  outputSchema: Record<string, unknown>;
+
+  /**
+   * Split a validated output into what's shown free vs gated behind
+   * the email form. Runs server-side before the response is returned.
    */
   teaser: (result: TOutput) => TeaserResult<TOutput>;
+
+  /**
+   * Opt into JD-style "dynamic wizard": the visitor uploads a single
+   * trigger file (e.g. a job description), the server analyzes it
+   * with Claude, and returns a custom MCQ wizard tuned to that file.
+   * Only after the wizard is answered does the rest of the chat flow
+   * (remaining file slots + Send) become available.
+   *
+   * When this is set on an agent, the chat reorders the visitor's
+   * journey:
+   *   1. Show only the `triggerSlot` upload (other slots hidden).
+   *   2. After upload + "Generate criteria" click, POST the trigger
+   *      file to /api/agents/{slug}/build-wizard.
+   *   3. Render the returned WizardDefinition via the standard
+   *      IcpWizard component.
+   *   4. On wizard completion, reveal all other slots and the Send
+   *      button — visitor uploads remaining files, runs the agent
+   *      with the composed ICP as `context`.
+   *
+   * For agents WITHOUT this field, the chat uses the existing flow:
+   * all slots visible up-front, preset wizard (if any), single Send.
+   */
+  dynamicWizard?: {
+    /** Form-data field key of the file slot whose upload triggers
+     *  wizard generation. Must reference a slot declared in
+     *  `fileSlots`. */
+    triggerSlot: string;
+  };
 }
 
 /**
- * Public-safe subset of the agent config. This is what the frontend receives
- * from `/api/agents/[slug]/config` — everything the UI needs, nothing that
- * would leak prompts or schema shape to a scraper.
+ * Public-safe subset of the agent config. What the frontend receives
+ * from `/api/agents/[slug]/config` — UI essentials only, no prompts
+ * or schema that a scraper could exfiltrate.
  */
 export interface PublicAgentConfig {
   slug: string;
@@ -348,6 +261,10 @@ export interface PublicAgentConfig {
   fileSlots: FileSlot[];
   contextInput?: ContextInput;
   gate: GateConfig;
+  /** Surfaced to the client so the chat can branch into the staged
+   *  upload→build-wizard→answer→upload-rest flow. The schema details
+   *  (prompts, JSON shape) stay server-side. */
+  dynamicWizard?: AgentConfig['dynamicWizard'];
 }
 
 export function toPublicConfig(config: AgentConfig): PublicAgentConfig {
@@ -360,5 +277,6 @@ export function toPublicConfig(config: AgentConfig): PublicAgentConfig {
     fileSlots: config.fileSlots,
     contextInput: config.contextInput,
     gate: config.gate,
+    dynamicWizard: config.dynamicWizard,
   };
 }

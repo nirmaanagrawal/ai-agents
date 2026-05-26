@@ -1,426 +1,141 @@
 /**
- * Lead Qualifier agent — Level 3 (Workflow).
+ * Lead Qualifier — Claude Agent SDK edition.
  *
- * Pipeline:
+ * Architecture shift from the previous workflow-runner version:
+ *   We don't declare explicit steps anymore. Claude runs the loop
+ *   itself — it reads the CSV, decides which leads need enrichment,
+ *   calls search_web / fetch_webpage as needed, and emits the final
+ *   structured output. The system prompt below is the only place we
+ *   describe "when to use which tool". No separate triage / pick /
+ *   enrich / final functions to maintain.
  *
- *   ┌───────────────┐   ┌────────────────────┐   ┌─────────────────┐   ┌──────────────────┐
- *   │ Initial score │ → │ Pick enrichment    │ → │ Enrich (cond.)  │ → │ Final score +    │
- *   │    (LLM)      │   │   candidates       │   │ (tools, parallel│   │   outreach       │
- *   │               │   │     (code)         │   │                 │   │     (LLM)        │
- *   └───────────────┘   └────────────────────┘   └─────────────────┘   └──────────────────┘
- *
- *   1. Initial score:   Claude scores every lead from CSV alone (fast,
- *                       no tools). Captures rough fit + a confidence flag.
- *   2. Pick candidates: pure code — selects up to 5 ambiguous leads
- *                       (borderline scores or missing data) for research.
- *                       Hard cap prevents runaway DDG quota use.
- *   3. Enrich:          conditional. Skipped if no candidates picked.
- *                       Otherwise fans out searchWeb + fetchWebpage in
- *                       parallel for each candidate.
- *   4. Final + outreach: Claude does the final scoring (incorporating
- *                       enrichment) and generates outreach copy.
- *
- * Why split scoring into two passes:
- *   - The first pass is fast and cheap; a 100-lead CSV gets a rough
- *     score in ~2s.
- *   - Only ~5% of leads typically need enrichment (the borderline ones).
- *     Doing tool calls per-lead unconditionally would 20× the latency
- *     and cost without proportional accuracy gain.
- *   - Visitors see the conditional logic in the trace as a real branch:
- *     "Step 3 — skipped: all 23 leads had high-confidence scores".
+ * Trade-off vs declarative workflow:
+ *   + Less code, less to maintain
+ *   + Agent can branch in ways we didn't predict (the right kind of
+ *     emergence for sales/qualification work)
+ *   - Less observability into "which step ran" (we record per-turn,
+ *     but the boundaries are fuzzier than named steps were)
+ *   - Slightly less deterministic — same input may produce slightly
+ *     different tool-call sequences across runs
  */
-import { generateObject } from 'ai';
-import { z } from 'zod';
+import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+import { checkHiringIntentTool } from '@/lib/agent-tools/check-hiring-intent';
+import { fetchWebpageTool } from '@/lib/agent-tools/fetch-webpage';
+import { searchWebTool } from '@/lib/agent-tools/search-web';
 import { truncateForModel } from '@/lib/parse-file';
-import { cachedMessages } from '@/lib/prompt-caching';
-import { fetchWebpage, searchWeb } from '@/lib/tools';
-import type {
-  AgentConfig,
-  ParsedInput,
-  ToolCallRecord,
-  WorkflowDefinition,
-  WorkflowStep,
-} from './types';
+import type { AgentConfig } from './types';
 
-// ---------------------------------------------------------------------------
-// Output schema (preserved from Level-2 version)
-// ---------------------------------------------------------------------------
-
-const LeadScoreSchema = z.object({
-  name: z.string(),
-  email: z.string().optional(),
-  score: z.number().int().min(0).max(100),
-  grade: z.enum(['HOT', 'WARM', 'COLD']),
-  reasoning: z.string().max(280),
-  suggestedOutreach: z.string().max(280),
-});
-
-const LeadQualifierOutputSchema = z.object({
-  totalLeads: z.number().int(),
-  hotCount: z.number().int(),
-  warmCount: z.number().int(),
-  coldCount: z.number().int(),
-  leads: z.array(LeadScoreSchema),
-});
-
-export type LeadQualifierOutput = z.infer<typeof LeadQualifierOutputSchema>;
-
-// ---------------------------------------------------------------------------
-// Internal state types
-// ---------------------------------------------------------------------------
-
-const TriagedLeadSchema = z.object({
-  rowIndex: z.number().int().describe('1-based row index from the source CSV'),
-  name: z.string(),
-  email: z.string().optional(),
-  company: z.string().optional(),
-  domain: z.string().optional().describe('Company website domain if extractable, no protocol'),
-  role: z.string().optional(),
-  initialScore: z.number().int().min(0).max(100),
-  initialReasoning: z.string().max(200),
-  /** Set true when score is borderline OR ICP fit can't be judged from CSV alone. */
-  uncertain: z.boolean(),
-  /** Why this lead is uncertain — used to drive enrichment query selection. */
-  uncertaintyReason: z.string().max(160).optional(),
-});
-type TriagedLead = z.infer<typeof TriagedLeadSchema>;
-
-interface EnrichmentResult {
-  rowIndex: number;
-  searchSummary?: string;
-  searchAbstract?: string;
-  searchSource?: string;
-  webpageTitle?: string;
-  webpageDescription?: string;
-  webpageText?: string;
+interface LeadOut {
+  name: string;
+  email?: string;
+  score: number;
+  grade: 'HOT' | 'WARM' | 'COLD';
+  reasoning: string;
+  suggestedOutreach: string;
+}
+export interface LeadQualifierOutput {
+  totalLeads: number;
+  hotCount: number;
+  warmCount: number;
+  coldCount: number;
+  leads: LeadOut[];
 }
 
-interface QualifierState {
-  leadFile: ParsedInput;
-  icp: string;
+const SYSTEM_PROMPT = `You are a B2B sales lead-qualification agent.
 
-  // After Triage
-  triaged?: TriagedLead[];
+INPUTS YOU RECEIVE
+  • An Ideal Customer Profile (ICP) — describes a great-fit lead.
+  • A list of leads as JSON rows (from a visitor's CSV).
 
-  // After PickCandidates
-  candidateRowIndices?: number[];
+YOUR JOB
+  Score every lead 0-100 against the ICP and produce a structured
+  output. Generate a paste-ready outreach opener for each lead.
 
-  // After Enrich (or skipped — empty array)
-  enrichments?: EnrichmentResult[];
+TOOLS AVAILABLE
+  • search_web(query):  DuckDuckGo Instant Answer. Good for well-known
+                        companies. Returns {empty: true} for long-tail
+                        private companies — that's a signal to fall
+                        back to fetch_webpage.
+  • fetch_webpage(url): Fetch the company's https://{domain} for their
+                        own description. Use as a fallback when
+                        search_web is empty AND the lead row has a
+                        domain we can hit.
+  • check_hiring_intent(domain): Probe a company's careers page for
+                        engineering-role posts. Strong HOT signal —
+                        if found:true and postsCount > 5, weight the
+                        lead's score +10 to +15 and prefer HOT grade.
+                        Use this on every lead that has a domain AND
+                        is borderline (40-70) or already trending HOT.
 
-  // After FinalScoring
-  finalOutput?: LeadQualifierOutput;
-}
+RESEARCH BUDGET
+  At most 12 tool calls total across the entire batch. Spend them on
+  borderline leads, or leads where hiring intent could push them HOT.
+  Skip clear-cut COLD (≤30) cases — they're not worth research budget.
+  Never call the same tool with the same args twice.
 
-// ---------------------------------------------------------------------------
-// System prompts (cached)
-// ---------------------------------------------------------------------------
+GRADES
+  HOT  = 80-100   strong ICP match AND (a buying signal / senior role
+                  / active hiring intent confirmed via check_hiring_intent)
+  WARM = 50-79    partial ICP match, worth nurture
+  COLD = 0-49     weak fit or insufficient information
 
-const TRIAGE_SYSTEM_PROMPT = `You are the triage phase of a B2B lead
-qualification workflow. You score every lead from the source CSV using
-ONLY the data in the row — no web research yet — and flag which leads
-need deeper enrichment in a later step.
+HIRING-INTENT BOOST
+  When check_hiring_intent returns found:true with postsCount ≥ 5,
+  apply a +10 to +15 score boost to that lead. PostsCount ≥ 15
+  combined with a senior-role title (VP / Director / Head / CTO) is
+  a near-automatic HOT regardless of other ICP gaps — open engineering
+  roles signal active buying. Cite the boost in your reasoning
+  ("found 12 engineering roles open per careers page → +15 → HOT").
 
-For each lead emit:
-  - rowIndex:   1-based source row position. Preserve the input order.
-  - name, email, company, domain, role: extract from the CSV. Leave
-    optional fields out when not present. Do NOT invent data.
-  - initialScore: 0-100 based on how well the CSV alone supports a fit
-    against the user's ICP. Score conservatively when key signals
-    (company, role) are missing.
-  - initialReasoning: one short sentence citing actual row data.
-  - uncertain: true when (a) the score lands in 40-70 (borderline), OR
-    (b) ICP fit can't be judged because key fields are missing. False
-    when the lead is clearly HOT (>=80) or clearly COLD (<=30).
-  - uncertaintyReason: one short phrase explaining what's missing or
-    ambiguous (used by the next step to pick what to research).
+RULES
+  • reasoning must cite actual data from the row OR the tool result.
+    No generic fluff like "looks promising". If you used a tool, name
+    what it told you ("DDG abstract confirms fintech vertical").
+  • suggestedOutreach is one sentence the rep could paste, referencing
+    something concrete (their role, company stage, recent news).
+  • Preserve input row order. Never invent leads that weren't given.
+  • Set totalLeads / hotCount / warmCount / coldCount to exactly match
+    the returned array.`;
 
-Never drop leads. Never invent leads. Output one record per input row.`;
-
-const FINAL_SYSTEM_PROMPT = `You are the final-scoring phase of a B2B
-lead qualification workflow. The triage phase has already scored each
-lead from the CSV alone, and an enrichment phase has fetched live web
-data for the most uncertain leads. Your job: produce the final score,
-grade, reasoning, and outreach copy for EVERY lead.
-
-Inputs you'll see:
-  - The user's ICP.
-  - The triaged leads (name, email, company, role, initialScore, etc.).
-  - Enrichment results keyed by rowIndex (search abstracts, webpage
-    descriptions). Many leads will have no enrichment — that's normal;
-    don't penalize them for it.
-
-Rules:
-  - Final score (0-100) reflects ICP fit using the CSV data PLUS any
-    enrichment available. If a lead was enriched, its reasoning MUST
-    cite a concrete fact from the enrichment ("DDG abstract confirms
-    fintech vertical, matches ICP" or "company website describes a
-    50-person team — fits mid-market").
-  - Grade: HOT 80-100, WARM 50-79, COLD 0-49.
-  - reasoning: one short sentence. Cite actual data; no fluff.
-  - suggestedOutreach: one paste-ready opener referencing something
-    concrete (their role, company stage, recent news from enrichment).
-  - Preserve input order. Never drop or invent leads.
-  - totalLeads / hotCount / warmCount / coldCount must exactly match the
-    returned array.`;
-
-// ---------------------------------------------------------------------------
-// Step 1 — Initial scoring
-// ---------------------------------------------------------------------------
-
-const triageStep: WorkflowStep<QualifierState> = {
-  id: 'triage',
-  name: 'Initial scoring (CSV only)',
-  description: 'Claude scores every lead from the CSV alone and flags which need research.',
-  async run(state, ctx) {
-    const csvBody = truncateForModel(state.leadFile.text, 10_000);
-    const icpBlock = state.icp.trim()
-      ? `Ideal Customer Profile:\n${state.icp.trim()}`
-      : 'Ideal Customer Profile: (not provided — use generic B2B sales judgment)';
-
-    const result = await generateObject({
-      model: ctx.model,
-      schema: z.object({ leads: z.array(TriagedLeadSchema) }),
-      messages: cachedMessages(
-        TRIAGE_SYSTEM_PROMPT,
-        `${icpBlock}\n\n---\n\nSource CSV (file: ${state.leadFile.filename}, ${state.leadFile.metadata.rowCount ?? 'unknown'} rows):\n${csvBody}`,
-      ),
-      temperature: 0.2,
-      abortSignal: ctx.abortSignal,
-    });
-
-    const triaged = result.object.leads;
-    const uncertainCount = triaged.filter((l) => l.uncertain).length;
-    return {
-      stateDelta: { triaged },
-      summary: `Scored ${triaged.length} lead(s); flagged ${uncertainCount} as uncertain (will enrich up to top 5).`,
-      modelTokens: result.usage?.totalTokens,
-    };
+// `additionalProperties: false` matters for Claude's structured-output mode —
+// without it the model sometimes adds stray fields and our retries burn out.
+// `email` is intentionally NOT in `required` (some leads have no email).
+const OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['totalLeads', 'hotCount', 'warmCount', 'coldCount', 'leads'],
+  properties: {
+    totalLeads: { type: 'integer' },
+    hotCount: { type: 'integer' },
+    warmCount: { type: 'integer' },
+    coldCount: { type: 'integer' },
+    leads: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'score', 'grade', 'reasoning', 'suggestedOutreach'],
+        properties: {
+          name: { type: 'string' },
+          email: { type: 'string' },
+          score: { type: 'integer', minimum: 0, maximum: 100 },
+          grade: { type: 'string', enum: ['HOT', 'WARM', 'COLD'] },
+          reasoning: { type: 'string', maxLength: 280 },
+          suggestedOutreach: { type: 'string', maxLength: 280 },
+        },
+      },
+    },
   },
-};
+} as const;
 
-// ---------------------------------------------------------------------------
-// Step 2 — Pick enrichment candidates (pure code)
-// ---------------------------------------------------------------------------
-
-const MAX_ENRICHMENT_CANDIDATES = 5;
-
-const pickCandidatesStep: WorkflowStep<QualifierState> = {
-  id: 'pick-candidates',
-  name: 'Pick enrichment candidates',
-  description:
-    `Pure code. Selects up to ${MAX_ENRICHMENT_CANDIDATES} uncertain ` +
-    'leads to enrich, prioritizing those with a usable company name or domain.',
-  async run(state) {
-    const triaged = state.triaged ?? [];
-    // Prioritize leads we can actually research: must have a company name
-    // or a domain. A lead flagged uncertain with no company info is just
-    // structurally unscoreable; tools won't help.
-    const enrichable = triaged
-      .filter((l) => l.uncertain)
-      .filter((l) => (l.company && l.company.trim()) || (l.domain && l.domain.trim()))
-      // Light tie-breaker: prefer scores closer to 50 (most ambiguous).
-      .sort(
-        (a, b) =>
-          Math.abs(a.initialScore - 50) - Math.abs(b.initialScore - 50),
-      )
-      .slice(0, MAX_ENRICHMENT_CANDIDATES);
-
-    return {
-      stateDelta: { candidateRowIndices: enrichable.map((l) => l.rowIndex) },
-      summary:
-        enrichable.length > 0
-          ? `Selected ${enrichable.length} lead(s) for enrichment: rows ${enrichable.map((l) => l.rowIndex).join(', ')}.`
-          : 'No enrichable candidates (no uncertain leads or none had company/domain info).',
-    };
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Step 3 — Enrich (conditional, parallel tool calls)
-// ---------------------------------------------------------------------------
-
-const enrichStep: WorkflowStep<QualifierState> = {
-  id: 'enrich',
-  name: 'Enrich uncertain leads (web research)',
-  description:
-    'Calls DuckDuckGo Instant Answer and the company website fetcher in ' +
-    'parallel for each candidate. Skipped entirely if step 2 selected nobody.',
-  condition(state) {
-    const n = state.candidateRowIndices?.length ?? 0;
-    if (n === 0) {
-      return {
-        run: false,
-        reason: 'no uncertain leads needed enrichment',
-      };
-    }
-    return true;
-  },
-  async run(state, ctx) {
-    const triaged = state.triaged ?? [];
-    const candidates = (state.candidateRowIndices ?? [])
-      .map((idx) => triaged.find((l) => l.rowIndex === idx))
-      .filter((l): l is TriagedLead => l != null);
-
-    const toolCalls: ToolCallRecord[] = [];
-
-    // Per-lead enrichment runs both tools in parallel; all leads also run
-    // in parallel. With 5 leads × 2 tools, total wall time ≈ slowest tool.
-    const enrichments: EnrichmentResult[] = await Promise.all(
-      candidates.map(async (lead) => {
-        const out: EnrichmentResult = { rowIndex: lead.rowIndex };
-
-        const searchPromise = (async () => {
-          // Prefer company name for the search; fall back to domain.
-          const query = (lead.company ?? lead.domain ?? lead.name).trim();
-          if (!query) return;
-          const t0 = Date.now();
-          const result = (await searchWeb.execute!(
-            { query },
-            { abortSignal: ctx.abortSignal, toolCallId: `srch-${lead.rowIndex}`, messages: [] },
-          )) as Record<string, unknown>;
-          const failed = typeof result.error === 'string';
-          toolCalls.push({
-            tool: 'searchWeb',
-            args: { query },
-            summary: failed
-              ? `error: ${String(result.error)}`
-              : result.empty
-                ? 'no DDG abstract'
-                : `${(result.heading as string) || 'ok'}${result.abstractSource ? ` · via ${result.abstractSource}` : ''}`,
-            failed,
-            durationMs: Date.now() - t0,
-          });
-          if (!failed && !result.empty) {
-            out.searchSummary = (result.heading as string) || query;
-            out.searchAbstract =
-              typeof result.abstract === 'string' ? result.abstract : undefined;
-            out.searchSource =
-              typeof result.abstractSource === 'string'
-                ? result.abstractSource
-                : undefined;
-          }
-        })();
-
-        const webpagePromise = (async () => {
-          // Only fetch the homepage if we have a domain. Don't try to
-          // construct a URL from the company name (too error-prone).
-          if (!lead.domain || !lead.domain.trim()) return;
-          const url = `https://${lead.domain.trim().replace(/^https?:\/\//, '')}`;
-          const t0 = Date.now();
-          const result = (await fetchWebpage.execute!(
-            { url },
-            { abortSignal: ctx.abortSignal, toolCallId: `web-${lead.rowIndex}`, messages: [] },
-          )) as Record<string, unknown>;
-          const failed = typeof result.error === 'string';
-          toolCalls.push({
-            tool: 'fetchWebpage',
-            args: { url },
-            summary: failed
-              ? `error: ${String(result.error)}`
-              : `${(result.title as string) || 'ok'} · ${typeof result.bytes === 'number' ? Math.round(result.bytes / 1024) + 'KB' : ''}`,
-            failed,
-            durationMs: Date.now() - t0,
-          });
-          if (!failed) {
-            out.webpageTitle =
-              typeof result.title === 'string' ? result.title : undefined;
-            out.webpageDescription =
-              typeof result.description === 'string'
-                ? result.description
-                : undefined;
-            // Trim to keep the FinalScoring prompt manageable.
-            out.webpageText =
-              typeof result.text === 'string' ? result.text.slice(0, 1500) : undefined;
-          }
-        })();
-
-        await Promise.all([searchPromise, webpagePromise]);
-        return out;
-      }),
-    );
-
-    return {
-      stateDelta: { enrichments },
-      summary:
-        `Enriched ${enrichments.length} lead(s) via ${toolCalls.length} tool call(s).`,
-      toolCalls,
-    };
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Step 4 — Final scoring + outreach
-// ---------------------------------------------------------------------------
-
-const finalScoringStep: WorkflowStep<QualifierState> = {
-  id: 'final-scoring',
-  name: 'Final scoring + outreach generation',
-  description:
-    'Claude produces the final score, grade, reasoning, and outreach copy ' +
-    'for every lead — citing enrichment facts where available.',
-  async run(state, ctx) {
-    const triaged = state.triaged ?? [];
-    const enrichments = state.enrichments ?? [];
-    const enrichmentByRow = new Map(enrichments.map((e) => [e.rowIndex, e]));
-
-    // Compose a compact JSON payload: triaged leads with any enrichment
-    // attached inline. Keeps the prompt easy to read for the model.
-    const composed = triaged.map((lead) => {
-      const enrich = enrichmentByRow.get(lead.rowIndex);
-      return enrich ? { ...lead, enrichment: enrich } : lead;
-    });
-
-    const result = await generateObject({
-      model: ctx.model,
-      schema: LeadQualifierOutputSchema,
-      messages: cachedMessages(
-        FINAL_SYSTEM_PROMPT,
-        `Ideal Customer Profile:
-${state.icp.trim() || '(not provided — use generic B2B judgment)'}
-
----
-
-Triaged leads (with enrichment attached where available):
-
-${JSON.stringify(composed, null, 2)}`,
-      ),
-      temperature: 0.2,
-      abortSignal: ctx.abortSignal,
-    });
-
-    return {
-      stateDelta: { finalOutput: result.object },
-      summary: `Final scoring: ${result.object.hotCount} HOT, ${result.object.warmCount} WARM, ${result.object.coldCount} COLD.`,
-      modelTokens: result.usage?.totalTokens,
-    };
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Workflow definition
-// ---------------------------------------------------------------------------
-
-const leadQualifierWorkflow: WorkflowDefinition<QualifierState, LeadQualifierOutput> = {
-  initialState({ files, context }) {
-    const leadFile = files.leads?.[0];
-    if (!leadFile) {
-      throw new Error('Lead Qualifier expected a file in the `leads` slot');
-    }
-    return { leadFile, icp: context };
-  },
-  steps: [triageStep, pickCandidatesStep, enrichStep, finalScoringStep],
-  finalize(state) {
-    if (!state.finalOutput) {
-      throw new Error('Workflow finished without producing final output');
-    }
-    return state.finalOutput;
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Agent config
-// ---------------------------------------------------------------------------
+// In-process MCP server holding this agent's tools. Tool names visible
+// to Claude become `mcp__leads__search_web`, `mcp__leads__fetch_webpage`,
+// and `mcp__leads__check_hiring_intent`.
+const leadsMcpServer = createSdkMcpServer({
+  name: 'leads',
+  version: '1.0.0',
+  tools: [searchWebTool, fetchWebpageTool, checkHiringIntentTool],
+});
 
 export const leadQualifier: AgentConfig<LeadQualifierOutput> = {
   slug: 'lead-qualifier',
@@ -469,15 +184,36 @@ export const leadQualifier: AgentConfig<LeadQualifierOutput> = {
 
   llm: {
     model: 'claude-haiku-4-5',
-    temperature: 0.2,
-    maxOutputTokens: 4000,
+    // 25 turns: 3 tools × up to N borderline leads + reasoning + final.
+    // The hiring-intent tool especially can run on every lead with a
+    // domain — give the SDK headroom to do thorough enrichment without
+    // hitting the cap.
+    maxTurns: 25,
   },
 
-  tools: { searchWeb, fetchWebpage },
+  systemPrompt: SYSTEM_PROMPT,
+  buildUserPrompt({ files, context }) {
+    const file = files.leads?.[0];
+    if (!file) {
+      throw new Error('Lead Qualifier expected a file in the `leads` slot');
+    }
+    const body = truncateForModel(file.text, 10_000);
+    const icpBlock = context.trim()
+      ? `Ideal Customer Profile:\n${context.trim()}`
+      : 'Ideal Customer Profile: (not provided — use generic B2B sales judgment)';
+    return `${icpBlock}\n\n---\n\nFile: ${file.filename}\nRow count: ${file.metadata.rowCount ?? 'unknown'}\n\nLeads (JSON array):\n${body}`;
+  },
 
-  workflow: leadQualifierWorkflow as WorkflowDefinition<unknown, LeadQualifierOutput>,
-
-  schema: LeadQualifierOutputSchema,
+  mcpServer: leadsMcpServer,
+  // The runtime always registers the agent's MCP server under the key
+  // `agent`, so Claude sees tool names as `mcp__agent__{tool}` regardless
+  // of what we named the server internally. Keep the names in sync here.
+  allowedTools: [
+    'mcp__agent__search_web',
+    'mcp__agent__fetch_webpage',
+    'mcp__agent__check_hiring_intent',
+  ],
+  outputSchema: OUTPUT_SCHEMA as unknown as Record<string, unknown>,
 
   teaser(result) {
     const TEASER_COUNT = 3;
