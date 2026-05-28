@@ -41,6 +41,16 @@
  *   Drag-and-drop on the composer auto-routes by extension to the first
  *   slot that accepts it. Files appear as removable chips per slot.
  */
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  AlertCircle,
+  ArrowUp,
+  Loader2,
+  Paperclip,
+  Sparkles,
+  UploadCloud,
+  X,
+} from 'lucide-react';
 import {
   type ChangeEvent,
   type DragEvent,
@@ -58,9 +68,18 @@ import {
   AgentTurnTraceView,
 } from './agent-renderers';
 import IcpWizard from './IcpWizard';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { arCollectionsWizard } from '@/lib/wizard/ar-collections';
 import { churnRiskWizard } from '@/lib/wizard/churn-risk';
 import { buildDynamicWizard } from '@/lib/wizard/dynamic';
+import { formatFileSize, getFileTypeMeta } from '@/lib/file-icons';
 import { gccProspectorWizard } from '@/lib/wizard/gcc-prospector';
 import { leadQualifierWizard } from '@/lib/wizard/lead-qualifier';
 import { salesProposalWizard } from '@/lib/wizard/sales-proposal';
@@ -71,6 +90,7 @@ import type {
   ToolCallRecord,
   AgentTurnRecord,
 } from '@/lib/agents/types';
+import { cn } from '@/lib/utils';
 
 /**
  * Per-agent decision: which slug uses which wizard. Keeping this in a
@@ -1056,9 +1076,27 @@ function ErrorView({ message }: { message: ErrorMessage }) {
 }
 
 // ---------------------------------------------------------------------------
-// Composer — text + per-slot file attachments + send
+// ChatComposer — premium chat input with unified file-attach surface
 // ---------------------------------------------------------------------------
 
+/**
+ * Premium composer pattern, one elevated card holding everything:
+ *   - File chips row at the top (one chip per attached file, with a
+ *     file-type icon, name, size, slot pill, and hover-to-remove ×)
+ *   - Auto-grow textarea in the middle (1 row → 8 rows, then scrolls)
+ *   - Footer: per-slot paperclip pills on the left, send button on
+ *     the right with a subtle morph between idle and processing
+ *
+ * Drag-over state lights up the entire card with a coral dashed
+ * border + an overlay tile saying "Drop files to attach." Files
+ * dropped here auto-route to the matching slot by extension; that
+ * routing logic lives in the parent (onComposerDrop), so this
+ * component just surfaces the visual affordance.
+ *
+ * Multi-slot agents render one "Add {slot}" pill per slot inline
+ * at the bottom-left of the composer — visitors see all options
+ * at once instead of guessing what a generic paperclip does.
+ */
 function Composer({
   agent,
   text,
@@ -1080,6 +1118,12 @@ function Composer({
   onRemoveFile: (slotKey: string, filename: string) => void;
   onSend: () => void;
 }) {
+  // Local drag-over state. We track this on the COMPOSER card itself
+  // so the visitor gets a clear "this is the drop target" affordance
+  // even when the actual onDrop handler is on the scroller above.
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
+
   const placeholder =
     agent.contextInput?.placeholder ??
     (agent.contextInput
@@ -1094,84 +1138,182 @@ function Composer({
     }
   };
 
+  // Drag tracking — `enter` and `leave` fire on EVERY child, so we
+  // count depth to avoid the overlay flickering as the cursor moves
+  // between the textarea, chips, and footer pills inside the card.
+  const onDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  };
+  const onDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dragDepthRef.current -= 1;
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0;
+      setIsDragOver(false);
+    }
+  };
+  const onDragOverComposer = (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+  };
+  const onDropComposer = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+    if (isProcessing) return;
+    const dropped = Array.from(e.dataTransfer.files);
+    // Route each dropped file to the first slot that accepts its
+    // extension. Same logic as the parent's scroller drop handler.
+    for (const file of dropped) {
+      const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
+      const slot = agent.fileSlots.find((s) => s.extensions.includes(ext));
+      if (slot) onAddFiles(slot.key, [file]);
+    }
+  };
+
+  const flatChips = agent.fileSlots.flatMap((slot) =>
+    (files[slot.key] ?? []).map((f) => ({ slot, file: f })),
+  );
+  const hasAnyFiles = flatChips.length > 0;
+  const acceptedExtensions = Array.from(
+    new Set(agent.fileSlots.flatMap((s) => s.extensions)),
+  );
+
   return (
-    <footer className="border-t border-border bg-background">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 py-3">
-        {/* Per-slot file chips. We render one chip strip per slot so the
-            visitor knows which file is going into which slot. */}
-        {agent.fileSlots.some((s) => (files[s.key]?.length ?? 0) > 0) && (
-          <div className="flex flex-wrap gap-2">
-            {agent.fileSlots.map((slot) => {
-              const slotFiles = files[slot.key] ?? [];
-              if (slotFiles.length === 0) return null;
-              return (
-                <div
-                  key={slot.key}
-                  className="flex flex-wrap items-center gap-1 rounded-lg bg-brand-50 px-2 py-1"
-                >
-                  <span className="text-xs font-medium text-brand-600">
-                    {slot.label}:
-                  </span>
-                  {slotFiles.map((f) => (
-                    <span
-                      key={f.name}
-                      className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-0.5 text-xs text-foreground/85"
-                    >
-                      📎 {f.name}
-                      <button
-                        type="button"
-                        onClick={() => onRemoveFile(slot.key, f.name)}
-                        disabled={isProcessing}
-                        className="text-muted-foreground/60 hover:text-red-500 disabled:opacity-50"
-                        aria-label={`Remove ${f.name}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
+    <footer className="border-t border-border bg-background/80 backdrop-blur-sm">
+      <div className="mx-auto w-full max-w-3xl px-4 py-3">
+        <div
+          onDragEnter={onDragEnter}
+          onDragOver={onDragOverComposer}
+          onDragLeave={onDragLeave}
+          onDrop={onDropComposer}
+          className={cn(
+            'group relative rounded-2xl border bg-card shadow-soft transition-all',
+            'focus-within:border-primary/60 focus-within:shadow-soft-lg',
+            isDragOver ? 'border-primary/70 ring-2 ring-primary/30' : 'border-border',
+            isProcessing && 'opacity-90',
+          )}
+        >
+          {/* Drag-over overlay — only visible when the user is dragging
+              a file over the composer. The pointer-events-none means
+              it doesn't intercept the drop event itself. */}
+          <AnimatePresence>
+            {isDragOver && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+                className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-card/85 backdrop-blur-[1px]"
+              >
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <div className="rounded-full bg-accent p-3 text-primary">
+                    <UploadCloud className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">
+                    Drop to attach
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {acceptedExtensions.join(' · ')}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        <div className="flex items-end gap-2">
-          {/* One attach button per declared slot. With multi-slot agents the
-              visitor sees explicit "Attach Invoices" + "Attach POs" buttons
-              which is clearer than a single generic file picker that has
-              to disambiguate after the fact. */}
-          <div className="flex shrink-0 flex-col gap-1">
-            {agent.fileSlots.map((slot) => (
-              <SlotAttachButton
-                key={slot.key}
-                slot={slot}
-                disabled={isProcessing}
-                onFilesPicked={(picked) => onAddFiles(slot.key, picked)}
-              />
-            ))}
-          </div>
+          {/* File chips row */}
+          {hasAnyFiles && (
+            <div className="flex flex-wrap gap-1.5 border-b border-border/60 px-3 pt-2.5 pb-2">
+              <AnimatePresence initial={false}>
+                {flatChips.map(({ slot, file }) => (
+                  <motion.div
+                    key={`${slot.key}__${file.name}`}
+                    layout
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ duration: 0.14 }}
+                  >
+                    <FileChip
+                      file={file}
+                      slotLabel={
+                        agent.fileSlots.length > 1 ? slot.label : undefined
+                      }
+                      disabled={isProcessing}
+                      onRemove={() => onRemoveFile(slot.key, file.name)}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
 
-          <textarea
+          {/* Auto-grow textarea */}
+          <Textarea
+            autoSize
+            minRows={1}
+            maxRows={8}
             value={text}
             onChange={(e) => onTextChange(e.target.value)}
             onKeyDown={onKeyDown}
             disabled={isProcessing}
             placeholder={placeholder}
-            rows={2}
-            className="min-h-[44px] flex-1 resize-none rounded-xl border border-border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-background"
+            className="w-full resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
           />
 
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={!canSend}
-            className="h-[44px] shrink-0 rounded-xl bg-brand-gradient px-5 text-sm font-semibold text-white shadow-brand-cta transition-all hover:-translate-y-0.5 hover:shadow-brand-cta-hover active:translate-y-0 disabled:cursor-not-allowed disabled:bg-none disabled:bg-ink-300 disabled:shadow-none disabled:hover:translate-y-0"
-          >
-            Send
-          </button>
+          {/* Footer row — attach pills + helper + send */}
+          <div className="flex items-center justify-between gap-3 border-t border-border/60 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {agent.fileSlots.map((slot) => (
+                <SlotAttachButton
+                  key={slot.key}
+                  slot={slot}
+                  multiSlot={agent.fileSlots.length > 1}
+                  disabled={isProcessing}
+                  onFilesPicked={(picked) => onAddFiles(slot.key, picked)}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                <kbd className="rounded border border-border bg-muted px-1 font-mono">↵</kbd>{' '}
+                to send
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    onClick={onSend}
+                    disabled={!canSend}
+                    size="icon"
+                    aria-label={isProcessing ? 'Agent is running' : 'Send message'}
+                    className="h-9 w-9 rounded-full disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isProcessing
+                    ? 'Agent is thinking…'
+                    : canSend
+                      ? 'Send (Enter)'
+                      : 'Attach the required files first'}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
         </div>
 
-        <p className="text-center text-[11px] text-muted-foreground/60">
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
           Drop files anywhere · Enter to send · Shift+Enter for newline
         </p>
       </div>
@@ -1179,12 +1321,76 @@ function Composer({
   );
 }
 
+// ---------------------------------------------------------------------------
+// FileChip — a single attached-file pill
+// ---------------------------------------------------------------------------
+
+function FileChip({
+  file,
+  slotLabel,
+  disabled,
+  onRemove,
+}: {
+  file: File;
+  /** Only set for multi-slot agents; identifies which slot it landed in. */
+  slotLabel?: string;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const { Icon, color, label } = getFileTypeMeta(file.name);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            'group/chip inline-flex max-w-xs items-center gap-2 rounded-lg border border-border bg-muted/60 px-2 py-1 text-xs',
+            disabled && 'opacity-60',
+          )}
+        >
+          <Icon className={cn('h-3.5 w-3.5 shrink-0', color)} />
+          <span className="truncate font-medium text-foreground">{file.name}</span>
+          <span className="shrink-0 text-muted-foreground">
+            {formatFileSize(file.size)}
+          </span>
+          {slotLabel && (
+            <Badge variant="muted" size="sm" className="shrink-0 font-normal">
+              {slotLabel}
+            </Badge>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={disabled}
+            aria-label={`Remove ${file.name}`}
+            className="ml-0.5 rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-destructive disabled:opacity-50"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        {label} · {formatFileSize(file.size)}
+        {slotLabel && ` · ${slotLabel}`}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SlotAttachButton — paperclip pill, one per declared slot
+// ---------------------------------------------------------------------------
+
 function SlotAttachButton({
   slot,
+  multiSlot,
   disabled,
   onFilesPicked,
 }: {
   slot: PublicAgentConfig['fileSlots'][number];
+  /** When true, render the slot label after the paperclip so the
+   *  visitor knows what to put in this slot. Single-slot agents get
+   *  just a paperclip icon to keep the footer tidy. */
+  multiSlot: boolean;
   disabled: boolean;
   onFilesPicked: (files: File[]) => void;
 }) {
@@ -1192,21 +1398,32 @@ function SlotAttachButton({
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
     if (picked.length > 0) onFilesPicked(picked.slice(0, slot.maxFiles));
-    // Reset so the same file can be re-picked after removal.
     e.target.value = '';
   };
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={disabled}
-        title={`Accepted: ${slot.extensions.join(', ')} · max ${slot.maxSizeMB}MB`}
-        className="inline-flex items-center justify-center rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground/85 hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        📎 {slot.label}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => inputRef.current?.click()}
+            disabled={disabled}
+            className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+            {multiSlot && <span>Add {slot.label.toLowerCase()}</span>}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {slot.label} · {slot.extensions.join(', ')} · max {slot.maxSizeMB}MB
+          {!slot.required && (
+            <span className="block text-[10px] text-muted-foreground">optional</span>
+          )}
+        </TooltipContent>
+      </Tooltip>
       <input
         ref={inputRef}
         type="file"
@@ -1227,12 +1444,12 @@ function SlotAttachButton({
  * Three-state inline panel for dynamic-wizard agents (Resume Screener
  * today). Renders inside the chat thread, NOT in the composer.
  *
- *   State 1 — no file:      Dropzone for the trigger slot.
+ *   State 1 — no file:      Big Dropzone for the trigger slot.
  *   State 2 — file attached: "Generate criteria from this JD" CTA.
  *   State 3 — building:     Spinner with reassuring text.
  *
- * Errors from the build-wizard endpoint surface as a small red
- * banner below the CTA. The visitor can re-upload to retry.
+ * Errors from the build-wizard endpoint surface as an inline banner
+ * below the CTA. The visitor can re-upload to retry.
  */
 function DynamicWizardTrigger({
   agent,
@@ -1259,22 +1476,32 @@ function DynamicWizardTrigger({
   if (!slot) return null;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-brand-100 bg-card p-5 shadow-brand-card">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-brand-700">
-          Step 1 of 3
-        </p>
-        <h3 className="mt-1 font-serif text-lg font-semibold text-foreground">
-          Upload the {slot.label.toLowerCase()} first
-        </h3>
-        <p className="mt-1 text-sm text-foreground/85">
-          We&apos;ll read it and build a short set of screening questions
-          tailored to this specific role. No preset MCQs — every option
-          comes from the {slot.label.toLowerCase()} itself.
-        </p>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-6"
+    >
+      <div className="flex items-start gap-3">
+        <div className="rounded-full bg-accent p-2 text-primary">
+          <Sparkles className="h-4 w-4" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+            Step 1 of 3
+          </p>
+          <h3 className="mt-0.5 font-serif text-lg font-semibold text-foreground">
+            Upload the {slot.label.toLowerCase()} first
+          </h3>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            We&apos;ll read it and build a short set of screening questions
+            tailored to this specific role. No preset MCQs — every option
+            comes from the {slot.label.toLowerCase()} itself.
+          </p>
+        </div>
       </div>
 
-      <TriggerFilePicker
+      <Dropzone
         slot={slot}
         files={files[triggerSlotKey] ?? []}
         onAddFiles={onAddFiles}
@@ -1283,8 +1510,8 @@ function DynamicWizardTrigger({
       />
 
       {building && (
-        <div className="flex items-center gap-3 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-700">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-accent/40 px-3 py-2 text-sm text-foreground">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
           <span>
             Reading the {slot.label.toLowerCase()} and building screening
             criteria… (10-30 seconds)
@@ -1293,34 +1520,44 @@ function DynamicWizardTrigger({
       )}
 
       {error && !building && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          ⚠ {error}
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      <button
+      <Button
         type="button"
         onClick={onBuildWizard}
         disabled={!triggerHasFile || building}
-        className="w-full rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-brand-cta transition-shadow hover:shadow-brand-cta-hover disabled:cursor-not-allowed disabled:bg-none disabled:bg-ink-300 disabled:shadow-none"
+        size="lg"
+        className="w-full"
       >
         {building
           ? 'Building criteria…'
           : triggerHasFile
-            ? `Generate criteria from this ${slot.label.toLowerCase()} →`
+            ? `Generate criteria from this ${slot.label.toLowerCase()}`
             : `Attach the ${slot.label.toLowerCase()} to continue`}
-      </button>
-    </div>
+      </Button>
+    </motion.div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Dropzone — large click-or-drop file picker
+// ---------------------------------------------------------------------------
+
 /**
- * Click-or-drop single-file picker for the dynamic-wizard trigger slot.
- * Lighter-weight than the Composer's SlotAttachButton because it's its
- * own large UI surface — visitors should know exactly where to drop
- * the JD without hunting for an attach button.
+ * Used inside DynamicWizardTrigger as the primary surface for the
+ * trigger file. Bigger than the chat composer's chip-style attach
+ * pills because it IS the page's main affordance until a file lands.
+ *
+ * Three visual states:
+ *   - idle:       dashed border, upload cloud icon, "drop or click"
+ *   - drag-over:  primary-tinted border + accent background overlay
+ *   - file-attached: replaced with a single FileChip-like row + Replace ×
  */
-function TriggerFilePicker({
+function Dropzone({
   slot,
   files,
   onAddFiles,
@@ -1335,15 +1572,59 @@ function TriggerFilePicker({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
 
   const handleFiles = (picked: File[]) => {
     if (picked.length === 0) return;
     // Single-file slot — replace if a file is already present.
-    if (files.length > 0) {
-      files.forEach((f) => onRemoveFile(f.name));
-    }
+    if (files.length > 0) files.forEach((f) => onRemoveFile(f.name));
     onAddFiles(picked.slice(0, slot.maxFiles));
   };
+
+  const onDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files') || disabled) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setDragOver(true);
+  };
+  const onDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dragDepthRef.current -= 1;
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0;
+      setDragOver(false);
+    }
+  };
+
+  if (files.length > 0) {
+    const file = files[0];
+    const { Icon, color, label } = getFileTypeMeta(file.name);
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
+        <div className={cn('rounded-md bg-card p-2', color)}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {label} · {formatFileSize(file.size)}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={disabled}
+          onClick={() => onRemoveFile(file.name)}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <X className="h-3.5 w-3.5" />
+          Replace
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -1357,13 +1638,15 @@ function TriggerFilePicker({
             inputRef.current?.click();
           }
         }}
+        onDragEnter={onDragEnter}
         onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
-          if (!disabled) setDragOver(true);
         }}
-        onDragLeave={() => setDragOver(false)}
+        onDragLeave={onDragLeave}
         onDrop={(e) => {
           e.preventDefault();
+          dragDepthRef.current = 0;
           setDragOver(false);
           if (disabled) return;
           const dropped = Array.from(e.dataTransfer.files);
@@ -1373,42 +1656,27 @@ function TriggerFilePicker({
           });
           handleFiles(ok);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors ${
-          disabled
-            ? 'cursor-not-allowed border-border bg-background opacity-60'
-            : dragOver
-              ? 'border-brand-500 bg-brand-50'
-              : files.length > 0
-                ? 'border-brand-200 bg-brand-50/30'
-                : 'border-border bg-background hover:border-brand-300'
-        }`}
-      >
-        {files.length > 0 ? (
-          <div className="flex w-full items-center justify-between gap-3 text-sm">
-            <span className="truncate text-foreground">📄 {files[0].name}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveFile(files[0].name);
-              }}
-              disabled={disabled}
-              className="rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Remove file"
-            >
-              Replace ×
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm font-medium text-foreground">
-              Drop a file here or click to browse
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {slot.extensions.join(' · ')} · up to {slot.maxSizeMB}MB
-            </p>
-          </>
+        className={cn(
+          'group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-all',
+          disabled && 'cursor-not-allowed opacity-60',
+          !disabled && dragOver && 'border-primary bg-accent/60 scale-[1.01]',
+          !disabled && !dragOver && 'border-border bg-muted/30 hover:border-primary/60 hover:bg-accent/30',
         )}
+      >
+        <div
+          className={cn(
+            'mb-3 rounded-full p-3 transition-colors',
+            dragOver ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground group-hover:text-primary',
+          )}
+        >
+          <UploadCloud className="h-5 w-5" />
+        </div>
+        <p className="text-sm font-medium text-foreground">
+          {dragOver ? 'Drop to attach' : 'Drag a file here, or click to browse'}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {slot.extensions.join(' · ')} · up to {slot.maxSizeMB}MB
+        </p>
       </div>
       <input
         ref={inputRef}
@@ -1424,6 +1692,7 @@ function TriggerFilePicker({
     </div>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Helpers
