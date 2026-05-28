@@ -168,8 +168,13 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
                 key={opt}
                 className={`group flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5 text-sm transition-all duration-200 ${
                   draft === opt
-                    ? 'border-brand-500 bg-brand-50 text-foreground shadow-sm'
-                    : 'border-border bg-card text-foreground/85 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-background hover:shadow-sm'
+                    // Selected state — coral-tinted background that
+                    // works in both light AND dark modes (brand colors
+                    // are theme-agnostic, so we use primary/10 instead
+                    // of the fixed brand-50 which was light-on-light
+                    // in dark mode).
+                    ? 'border-primary bg-primary/10 text-foreground shadow-sm'
+                    : 'border-border bg-card text-foreground/85 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-sm'
                 }`}
               >
                 <input
@@ -215,8 +220,11 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
                     }}
                     className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                       active
+                        // Active multi-select chip — hard coral
+                        // gradient + white text reads well in both
+                        // themes since both fills are theme-agnostic.
                         ? 'border-brand-500 bg-brand-gradient text-white shadow-brand-cta'
-                        : 'border-border bg-card text-foreground/85 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-background hover:shadow-sm'
+                        : 'border-border bg-card text-foreground/85 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-sm'
                     }`}
                   >
                     {active && <span className="mr-1">✓</span>}
@@ -271,7 +279,7 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
             type="button"
             onClick={() => next(false)}
             disabled={!canAdvance}
-            className="rounded-xl bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-white shadow-brand-cta transition-all hover:-translate-y-0.5 hover:shadow-brand-cta-hover active:translate-y-0 disabled:cursor-not-allowed disabled:bg-none disabled:bg-ink-300 disabled:shadow-none disabled:hover:translate-y-0"
+            className="rounded-xl bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-white shadow-brand-cta transition-all hover:-translate-y-0.5 hover:shadow-brand-cta-hover active:translate-y-0 disabled:cursor-not-allowed disabled:bg-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none disabled:hover:translate-y-0"
           >
             {idx + 1 === total ? 'Finish →' : 'Next →'}
           </button>

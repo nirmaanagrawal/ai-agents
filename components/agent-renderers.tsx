@@ -184,7 +184,7 @@ export function ToolTraceView({ trace }: { trace: ToolCallRecord[] }) {
   const totalMs = trace.reduce((n, t) => n + (t.durationMs || 0), 0);
 
   return (
-    <div className="rounded-lg border border-brand-100 bg-brand-50/50 p-3">
+    <div className="rounded-lg border border-brand-100 bg-accent/50 p-3">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -590,7 +590,7 @@ function InvoiceRow({ invoice }: { invoice: Record<string, unknown> }) {
             </details>
           )}
           {vendorOutreach && (
-            <details className="rounded border border-brand-100 bg-brand-50 px-2 py-1.5 text-xs">
+            <details className="rounded border border-brand-100 bg-accent px-2 py-1.5 text-xs">
               <summary className="cursor-pointer font-medium text-brand-700">
                 ✉ Vendor outreach draft — paste verbatim
               </summary>
@@ -687,7 +687,7 @@ function ProspectsView({ result }: { result: Record<string, unknown> }) {
       </div>
 
       {insights.length > 0 && (
-        <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+        <div className="rounded-lg border border-brand-100 bg-accent p-3">
           <p className="mb-2 text-sm font-semibold text-brand-700">
             🔭 Cross-batch insights
           </p>
@@ -773,7 +773,7 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
             <span className="truncate">{name}</span>
             {underTheRadar && (
               <span
-                className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700"
+                className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-brand-700"
                 title="Not covered in mainstream GCC press"
               >
                 under-the-radar
@@ -867,7 +867,7 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
           additions. Outreach is collapsed by default; the AE opens
           it when they're ready to send. */}
       {outreach && (
-        <details className="mt-2 rounded border border-brand-100 bg-brand-50 px-2 py-1.5 text-xs">
+        <details className="mt-2 rounded border border-brand-100 bg-accent px-2 py-1.5 text-xs">
           <summary className="cursor-pointer font-medium text-brand-700">
             ✉ First-touch outreach — paste-ready
           </summary>
@@ -1041,7 +1041,7 @@ function VendorRow({ vendor }: { vendor: Record<string, unknown> }) {
               <span className="text-xs font-normal text-muted-foreground">#{vendorId}</span>
             )}
             {isStrategic && (
-              <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
+              <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
                 strategic
               </span>
             )}
@@ -1103,7 +1103,7 @@ function VendorRow({ vendor }: { vendor: Record<string, unknown> }) {
       )}
       {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
       {action && (
-        <p className="mt-2 rounded bg-brand-50 px-2 py-1 text-xs text-brand-700">
+        <p className="mt-2 rounded bg-accent px-2 py-1 text-xs text-brand-700">
           → <span className="font-medium">Recommended:</span> {action}
         </p>
       )}
@@ -1233,7 +1233,7 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
       ? 'bg-emerald-100 text-emerald-700'
       : grade === 'REVIEW'
         ? 'bg-amber-100 text-amber-800'
-        : 'bg-ink-300/40 text-foreground/85';
+        : 'bg-muted text-foreground/85';
   const gradeLabel =
     grade === 'SHORTLIST' ? 'SHORTLIST' : grade === 'REVIEW' ? 'REVIEW' : 'POLITE NO';
 
@@ -1324,7 +1324,7 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
       )}
 
       {outreach && (
-        <p className="mt-2 rounded bg-brand-50 px-2 py-1 text-xs text-brand-700">
+        <p className="mt-2 rounded bg-accent px-2 py-1 text-xs text-brand-700">
           💬 {outreach}
         </p>
       )}
@@ -1429,7 +1429,7 @@ function AccountsView({ result }: { result: Record<string, unknown> }) {
       </div>
 
       {drivers.length > 0 && (
-        <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+        <div className="rounded-lg border border-brand-100 bg-accent p-3">
           <p className="mb-2 text-sm font-semibold text-brand-700">
             🔭 Top churn drivers across the portfolio
           </p>
@@ -1536,7 +1536,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
               <span className="text-xs font-normal text-muted-foreground">#{accountId}</span>
             )}
             {isStrategic && (
-              <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
+              <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
                 strategic
               </span>
             )}
@@ -1604,7 +1604,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
       {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
 
       {play && (
-        <div className="mt-2 rounded border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs">
+        <div className="mt-2 rounded border border-brand-200 bg-accent px-2.5 py-1.5 text-xs">
           <span className="font-medium text-brand-700">
             🛟 Recommended save play:
           </span>{' '}
@@ -1616,7 +1616,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
       )}
 
       {email && (
-        <details className="mt-2 rounded border border-brand-100 bg-brand-50/40 px-2.5 py-1.5 text-xs">
+        <details className="mt-2 rounded border border-brand-100 bg-accent/40 px-2.5 py-1.5 text-xs">
           <summary className="cursor-pointer font-medium text-brand-700">
             ✉ Draft retention email — paste-ready
           </summary>
@@ -1891,7 +1891,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {whyUs.length > 0 && (
-        <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+        <div className="rounded-lg border border-brand-100 bg-accent p-3">
           <p className="mb-1 text-sm font-semibold text-brand-700">⭐ Why us</p>
           <ul className="space-y-1 text-sm text-foreground">
             {whyUs.map((s, i) => (
@@ -1949,7 +1949,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {coverEmail && (
-        <details className="rounded-lg border border-brand-200 bg-brand-50/40 p-3" open>
+        <details className="rounded-lg border border-brand-200 bg-accent/40 p-3" open>
           <summary className="cursor-pointer text-sm font-semibold text-brand-700">
             ✉ Paste-ready cover email
           </summary>
@@ -1960,7 +1960,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {altApproach && (
-        <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+        <div className="rounded-lg border border-brand-100 bg-accent p-3">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
             🔄 Alternative approach (if they push back)
           </p>
@@ -2106,7 +2106,7 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
       </div>
 
       {risks.length > 0 && (
-        <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+        <div className="rounded-lg border border-brand-100 bg-accent p-3">
           <p className="mb-2 text-sm font-semibold text-brand-700">
             🔭 Top collection risks
           </p>
@@ -2223,7 +2223,7 @@ function ReceivableRow({
             <span className="truncate">{customer}</span>
             <span className="text-xs font-normal text-muted-foreground">#{id}</span>
             {isStrategic && (
-              <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
+              <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
                 strategic
               </span>
             )}
@@ -2274,7 +2274,7 @@ function ReceivableRow({
       )}
 
       {action && (
-        <div className="mt-2 rounded border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs">
+        <div className="mt-2 rounded border border-brand-200 bg-accent px-2.5 py-1.5 text-xs">
           <span className="font-medium text-brand-700">🛠 Recommended action:</span>{' '}
           <span className="text-foreground">{action}</span>
           {escalateTo && (
@@ -2284,7 +2284,7 @@ function ReceivableRow({
       )}
 
       {email && (
-        <details className="mt-2 rounded border border-brand-100 bg-brand-50/40 px-2.5 py-1.5 text-xs">
+        <details className="mt-2 rounded border border-brand-100 bg-accent/40 px-2.5 py-1.5 text-xs">
           <summary className="cursor-pointer font-medium text-brand-700">
             ✉ Draft dunning email — paste-ready
           </summary>
@@ -2336,7 +2336,7 @@ export function GateForm({
   const message = gate.message.replace('{remaining}', String(remaining));
 
   return (
-    <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
+    <div className="rounded-xl border border-brand-100 bg-accent p-4">
       <p className="mb-3 text-center text-sm font-medium text-brand-700">🔒 {message}</p>
       <form
         onSubmit={(e) => {
