@@ -367,8 +367,12 @@ export const salesProposal: AgentConfig<SalesProposalOutput> = {
   },
 
   gate: {
+    // {remaining} substitutes the count returned by `teaser()` — sum
+    // of hidden scope bullets + pricing rows + risks + next steps +
+    // 1 for the cover email. Gives the visitor a concrete sense of
+    // how much is behind the gate before they commit their email.
     message:
-      'See the full proposal — every section, pricing table, paste-ready cover email, and the agent\'s win-probability call. Drop your email to unlock.',
+      '{remaining} more details behind the gate — full pricing table, paste-ready cover email, risks, and next steps. Drop your email to unlock the rest of the proposal.',
     ctaText: 'Unlock Full Proposal',
     fields: [
       { name: 'email', type: 'email', label: 'Work email', required: true },
