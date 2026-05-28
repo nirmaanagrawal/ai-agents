@@ -1,19 +1,24 @@
 /**
- * Vendor Evaluator wizard — 12 MCQs that anchor the KPI thresholds
- * and review preferences the agent uses to score each vendor.
+ * Vendor Evaluator wizard — 8 MCQs that anchor the KPI thresholds and
+ * review preferences the agent uses to score each vendor.
  *
- * Why this matters:
- *   "Good" vendor performance is wildly different in different
- *   industries. A 95% on-time delivery rate is excellent for
- *   semiconductor fab supply but mediocre for a SaaS reseller. A 2%
- *   defect rate is normal in textile but catastrophic in pharma.
- *   Without thresholds the agent has nothing to grade against.
+ * Trimmed from an earlier 12-question version. The four cut were:
+ *   - source_system    — agent can infer column names from the data
+ *   - review_period    — agent can detect the period from data dates
+ *   - compliance_focus — nice-to-have, not consistently applicable
+ *   - review_output    — boilerplate sections the agent ships anyway
  *
- *   These 12 questions cover: industry context, KPI priorities, hard
- *   thresholds (delivery / defects / invoice accuracy), spend tier
- *   definitions, review cadence, underperformer policy, and what the
- *   quarterly review document should include. The composed ICP block
- *   becomes the agent's grading rubric.
+ * What's left covers the dimensions that actually drive a vendor
+ * grade: category context, priority KPIs, hard thresholds (on-time
+ * delivery / defects / invoice variance), the strategic-vendor spend
+ * floor, and the underperformer policy (definition + allowed
+ * actions). The composed block becomes the agent's grading rubric.
+ *
+ * Why thresholds matter: "good" vendor performance is wildly different
+ * by industry. 95% on-time is excellent for semiconductor fab but
+ * mediocre for SaaS resellers; 2% defect is normal in textile but
+ * catastrophic in pharma. Without thresholds the agent has nothing to
+ * grade against.
  */
 import type { Answer, Question, WizardDefinition } from './types';
 
@@ -23,7 +28,7 @@ const QUESTIONS: Question[] = [
     kind: 'multi',
     required: true,
     allowOther: true,
-    prompt: '1 / 12 — What kind of vendors are you evaluating?',
+    prompt: '1 / 8 — What kind of vendors are you evaluating?',
     helpText:
       'Pick all that apply. Different categories carry different default expectations.',
     options: [
@@ -42,28 +47,10 @@ const QUESTIONS: Question[] = [
     ],
   },
   {
-    id: 'source_system',
-    kind: 'single',
-    required: true,
-    prompt: '2 / 12 — Where is the transaction data exported from?',
-    helpText: 'Helps the agent know which column names to expect.',
-    options: [
-      'NetSuite',
-      'SAP',
-      'QuickBooks',
-      'Oracle Procurement Cloud',
-      'Coupa',
-      'Ariba',
-      'Custom procurement portal',
-      'Spreadsheet kept manually',
-      'Mixed / multiple sources',
-    ],
-  },
-  {
     id: 'priority_kpis',
     kind: 'multi',
     required: true,
-    prompt: '3 / 12 — Which KPIs matter MOST to your business? (pick 3-5)',
+    prompt: '2 / 8 — Which KPIs matter MOST to your business? (pick 3-5)',
     helpText: 'Weights the composite score — picked KPIs count more.',
     options: [
       'On-time delivery rate',
@@ -84,7 +71,7 @@ const QUESTIONS: Question[] = [
     id: 'ontime_threshold',
     kind: 'single',
     required: true,
-    prompt: '4 / 12 — On-time delivery threshold for "acceptable"?',
+    prompt: '3 / 8 — On-time delivery threshold for "acceptable"?',
     options: [
       '≥ 99% (mission-critical / pharma / aerospace)',
       '≥ 97% (high-stakes manufacturing)',
@@ -98,7 +85,7 @@ const QUESTIONS: Question[] = [
     id: 'defect_tolerance',
     kind: 'single',
     required: true,
-    prompt: '5 / 12 — Defect / reject rate tolerance for "acceptable"?',
+    prompt: '4 / 8 — Defect / reject rate tolerance for "acceptable"?',
     options: [
       '≤ 0.1% (pharma / aerospace / safety-critical)',
       '≤ 0.5% (precision manufacturing)',
@@ -112,7 +99,7 @@ const QUESTIONS: Question[] = [
     id: 'invoice_tolerance',
     kind: 'single',
     required: true,
-    prompt: '6 / 12 — Invoice-accuracy tolerance (vs PO + receipt)?',
+    prompt: '5 / 8 — Invoice-accuracy tolerance (vs PO + receipt)?',
     options: [
       '0% variance (exact match required)',
       'Up to 1% line variance',
@@ -126,7 +113,7 @@ const QUESTIONS: Question[] = [
     id: 'spend_tier_threshold',
     kind: 'single',
     required: true,
-    prompt: '7 / 12 — What annual spend qualifies as a "strategic" vendor?',
+    prompt: '6 / 8 — What annual spend qualifies as a "strategic" vendor?',
     helpText: 'Higher-spend vendors get tighter scrutiny in the review.',
     options: [
       'Over $1M / ₹1 Cr',
@@ -137,23 +124,10 @@ const QUESTIONS: Question[] = [
     ],
   },
   {
-    id: 'review_period',
-    kind: 'single',
-    required: true,
-    prompt: '8 / 12 — What time period does this review cover?',
-    options: [
-      'Last quarter (3 months)',
-      'Last 6 months',
-      'Last year (12 months)',
-      'Year-to-date',
-      'Custom period defined in the data',
-    ],
-  },
-  {
     id: 'underperformer_definition',
     kind: 'multi',
     required: true,
-    prompt: '9 / 12 — A "chronic underperformer" is one that…',
+    prompt: '7 / 8 — A "chronic underperformer" is one that…',
     helpText: 'Pick all that apply. ANY checked condition triggers the chronic flag.',
     options: [
       'Missed delivery target 3+ times in the period',
@@ -161,7 +135,7 @@ const QUESTIONS: Question[] = [
       'Invoice variance > threshold on 5+ invoices',
       'Caused a production / customer escalation',
       'Failed a compliance / audit check',
-      'Was on probation in the previous review and didn\'t improve',
+      "Was on probation in the previous review and didn't improve",
       'Has < 3 months of data (not enough to judge — flag for review)',
     ],
   },
@@ -169,7 +143,7 @@ const QUESTIONS: Question[] = [
     id: 'action_policy',
     kind: 'multi',
     required: true,
-    prompt: '10 / 12 — What actions are available for underperformers?',
+    prompt: '8 / 8 — What actions are available for underperformers?',
     helpText: 'Drives the "recommendedAction" the agent suggests per vendor.',
     options: [
       'Issue formal performance-improvement letter',
@@ -178,43 +152,8 @@ const QUESTIONS: Question[] = [
       'Renegotiate SLA + contractual penalties',
       'Demand root-cause analysis from vendor',
       'Move to backup / replace entirely',
-      'Escalate to vendor\'s leadership',
+      "Escalate to vendor's leadership",
       'Add to do-not-engage list',
-    ],
-  },
-  {
-    id: 'compliance_focus',
-    kind: 'multi',
-    allowOther: true,
-    prompt: '11 / 12 — Any compliance / regulatory dimensions to weight?',
-    options: [
-      'ISO 9001 quality management',
-      'ISO 14001 environmental',
-      'ISO 27001 information security',
-      'GST / tax compliance (India)',
-      'GDPR / data privacy',
-      'HIPAA (healthcare)',
-      'SOC 2 (SaaS vendors)',
-      'FDA / pharma regulatory',
-      'Modern Slavery Act',
-      'Conflict-minerals disclosure',
-      'Diversity supplier certification (MBE / WBE / DBE)',
-    ],
-  },
-  {
-    id: 'review_output',
-    kind: 'multi',
-    required: true,
-    prompt: '12 / 12 — What MUST the quarterly review include?',
-    options: [
-      'Top-10 best performers (recognition)',
-      'Bottom-10 worst performers (action list)',
-      'Spend concentration / over-reliance flags',
-      'Trend analysis (improving vs declining vs stable)',
-      'New vendors in period (probationary status)',
-      'Recommended renegotiation candidates',
-      'Cost-savings opportunities',
-      'Per-category benchmark vs portfolio average',
     ],
   },
 ];
@@ -242,21 +181,9 @@ function composeIcp(answers: Record<string, Answer>): string {
     lines.push(...bullets(cats));
   }
 
-  const src = one('source_system');
-  if (src) {
-    lines.push('', '## Source System');
-    lines.push(`- ${src}`);
-    lines.push(
-      '- The uploaded file is an export from this system. Column names may vary; map them sensibly (e.g., "Vendor Name" / "Supplier" / "Payee" all → vendor).',
-    );
-  }
-
   const kpis = list('priority_kpis');
   if (kpis.length) {
-    lines.push(
-      '',
-      '## Priority KPIs (weight these MORE heavily in the composite score)',
-    );
+    lines.push('', '## Priority KPIs (weight these MORE heavily in the composite score)');
     lines.push(...bullets(kpis));
   }
 
@@ -279,12 +206,6 @@ function composeIcp(answers: Record<string, Answer>): string {
     );
   }
 
-  const period = one('review_period');
-  if (period) {
-    lines.push('', '## Review Period');
-    lines.push(`- ${period}`);
-  }
-
   const chronic = list('underperformer_definition');
   if (chronic.length) {
     lines.push('', '## Chronic-Underperformer Definition (any condition fires the flag)');
@@ -298,18 +219,6 @@ function composeIcp(answers: Record<string, Answer>): string {
     lines.push(
       '- Pick from THIS LIST when filling `recommendedAction` per vendor. Do not invent new actions outside the list.',
     );
-  }
-
-  const compliance = list('compliance_focus');
-  if (compliance.length) {
-    lines.push('', '## Compliance Dimensions to Flag');
-    lines.push(...bullets(compliance));
-  }
-
-  const output = list('review_output');
-  if (output.length) {
-    lines.push('', '## Required Sections in the Quarterly Review Output');
-    lines.push(...bullets(output));
   }
 
   return lines.join('\n');
