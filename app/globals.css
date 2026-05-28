@@ -1,3 +1,147 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/**
+ * Beanbag AI marketplace — design tokens.
+ *
+ * Two-axis theme system:
+ *   1. Brand tokens (brand-*, cream-*, ink-*) stay as before so the
+ *      brand identity remains stable; legacy components keep working.
+ *   2. Semantic tokens (--background, --foreground, --primary, etc.)
+ *      drive the shadcn-style UI primitives and adapt to dark mode.
+ *
+ * Brand direction: "Refined warmth" — coral as identity accent, warm
+ * cream surfaces in light mode, warm dark with brown undertone in
+ * dark mode. Avoids the cold slate/zinc palette of generic SaaS dashboards.
+ */
+@layer base {
+  :root {
+    /* Warm-cream surface system (light mode) */
+    --background: 42 38% 95%;          /* cream-50ish */
+    --foreground: 0 0% 10%;            /* ink-900 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Coral accent — beanbag.ai's hero color */
+    --primary: 11 80% 56%;             /* #ea6347 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 42 38% 91%;           /* cream-100 */
+    --secondary-foreground: 0 0% 10%;
+
+    --muted: 42 30% 88%;                /* cream-200 */
+    --muted-foreground: 0 0% 40%;       /* ink-700 */
+
+    --accent: 11 70% 96%;               /* brand-50 */
+    --accent-foreground: 11 70% 30%;    /* brand-700 */
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 60% 38%;
+    --warning: 38 90% 50%;
+
+    --border: 42 18% 86%;
+    --input: 42 18% 86%;
+    --ring: 11 80% 56%;                 /* coral focus ring */
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* Warm dark — brown-tinted near-black, NOT slate/zinc */
+    --background: 24 14% 8%;
+    --foreground: 42 18% 92%;
+
+    --card: 24 14% 11%;
+    --card-foreground: 42 18% 92%;
+
+    --popover: 24 14% 11%;
+    --popover-foreground: 42 18% 92%;
+
+    /* Coral pops harder in dark; bump saturation slightly */
+    --primary: 11 78% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 24 14% 14%;
+    --secondary-foreground: 42 18% 92%;
+
+    --muted: 24 14% 14%;
+    --muted-foreground: 42 8% 68%;
+
+    --accent: 24 14% 18%;
+    --accent-foreground: 11 70% 70%;
+
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 55% 50%;
+    --warning: 38 85% 58%;
+
+    --border: 24 14% 18%;
+    --input: 24 14% 18%;
+    --ring: 11 78% 62%;
+  }
+
+  /* Smooth color transitions when toggling theme — but never on
+     elements that animate via Framer Motion, to avoid double-anim. */
+  *,
+  *::before,
+  *::after {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: 'cv11', 'ss01', 'ss03'; /* Geist Sans niceties */
+  }
+
+  /* Subtle warm-grain texture on body — reads "premium editorial",
+     not "techy gradient". Stays under 1% noise so it doesn't compete
+     with content. Drops in dark mode (grain looks gross on dark). */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.025;
+    mix-blend-mode: multiply;
+  }
+  .dark body::before {
+    opacity: 0;
+  }
+
+  /* Better focus outline — coral, generous, accessible */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* Scrollbar polish — thin, branded, only on desktop */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.25);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.45);
+  }
+}

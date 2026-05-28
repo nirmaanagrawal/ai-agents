@@ -67,10 +67,10 @@ export function AgentTurnTraceView({ trace }: { trace: AgentTurnRecord[] }) {
   const totalToolCalls = trace.reduce((n, t) => n + (t.toolCalls?.length ?? 0), 0);
 
   return (
-    <div className="rounded-lg border border-cream-200 bg-cream-50 p-3">
+    <div className="rounded-lg border border-border bg-background p-3">
       <div className="mb-2 flex items-center gap-2 text-sm">
         <span className="text-brand-500">⚙️</span>
-        <span className="font-medium text-ink-900">
+        <span className="font-medium text-foreground">
           Agent ran {completed} turn{completed === 1 ? '' : 's'}
           {totalToolCalls > 0 && (
             <span className="text-brand-500"> · {totalToolCalls} tool call{totalToolCalls === 1 ? '' : 's'}</span>
@@ -93,14 +93,14 @@ export function AgentTurnTraceView({ trace }: { trace: AgentTurnRecord[] }) {
                 disabled={!isClickable}
                 onClick={() => setExpandedTurn(isExpanded ? null : turn.turn)}
                 className={`group flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${
-                  isClickable ? 'hover:bg-cream-200/50' : ''
+                  isClickable ? 'hover:bg-muted/50' : ''
                 }`}
               >
                 <TurnIcon status={turn.status} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-ink-900">Turn {turn.turn}</span>
-                    <span className="flex items-center gap-2 text-xs text-ink-500">
+                    <span className="font-medium text-foreground">Turn {turn.turn}</span>
+                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
                       {hasToolCalls && (
                         <span className="rounded bg-brand-100 px-1.5 text-brand-600">
                           🔧 {turn.toolCalls!.length}
@@ -117,7 +117,7 @@ export function AgentTurnTraceView({ trace }: { trace: AgentTurnRecord[] }) {
                   {turn.narration && (
                     <p
                       className={`mt-0.5 line-clamp-2 text-xs ${
-                        turn.status === 'failed' ? 'text-red-700' : 'text-ink-700'
+                        turn.status === 'failed' ? 'text-red-700' : 'text-foreground/85'
                       }`}
                     >
                       {turn.narration}
@@ -127,9 +127,9 @@ export function AgentTurnTraceView({ trace }: { trace: AgentTurnRecord[] }) {
               </button>
 
               {isExpanded && (
-                <div className="ml-8 mt-1 space-y-1 border-l-2 border-cream-300 pl-3">
+                <div className="ml-8 mt-1 space-y-1 border-l-2 border-border pl-3">
                   {turn.narration && (
-                    <p className="whitespace-pre-wrap text-xs text-ink-700">
+                    <p className="whitespace-pre-wrap text-xs text-foreground/85">
                       {turn.narration}
                     </p>
                   )}
@@ -227,7 +227,7 @@ function ToolCallRow({ call: t, idx }: { call: ToolCallRecord; idx?: number }) {
       className={`rounded border px-2 py-1.5 text-xs ${
         t.failed
           ? 'border-red-200 bg-red-50 text-red-800'
-          : 'border-brand-100 bg-white text-ink-700'
+          : 'border-brand-100 bg-card text-foreground/85'
       }`}
     >
       <div className="flex items-center justify-between">
@@ -235,9 +235,9 @@ function ToolCallRow({ call: t, idx }: { call: ToolCallRecord; idx?: number }) {
           {idx != null ? `${idx}. ` : ''}
           {t.tool}
         </span>
-        {t.durationMs > 0 && <span className="text-ink-300">{t.durationMs}ms</span>}
+        {t.durationMs > 0 && <span className="text-muted-foreground/60">{t.durationMs}ms</span>}
       </div>
-      <div className="mt-0.5 truncate font-mono text-ink-500">{JSON.stringify(t.args)}</div>
+      <div className="mt-0.5 truncate font-mono text-muted-foreground">{JSON.stringify(t.args)}</div>
       <div className={`mt-0.5 ${t.failed ? 'text-red-700' : 'text-brand-600'}`}>
         → {t.summary}
       </div>
@@ -261,7 +261,7 @@ function LeadsView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-serif text-lg font-semibold text-ink-900">
+        <h3 className="font-serif text-lg font-semibold text-foreground">
           Scored {total} lead{total === 1 ? '' : 's'}
         </h3>
         <div className="flex gap-2 text-xs font-medium">
@@ -297,20 +297,20 @@ function LeadRow({ lead }: { lead: Record<string, unknown> }) {
       ? 'bg-red-100 text-red-700'
       : grade === 'WARM'
         ? 'bg-yellow-100 text-yellow-700'
-        : 'bg-cream-200 text-ink-700';
+        : 'bg-muted text-foreground/85';
 
   return (
-    <div className="rounded-lg border bg-white p-3 transition-shadow hover:shadow-sm">
+    <div className="rounded-lg border bg-card p-3 transition-shadow hover:shadow-sm">
       <div className="flex items-center justify-between">
         <div className="min-w-0">
-          <p className="truncate font-medium text-ink-900">{name}</p>
-          {email && <p className="truncate text-sm text-ink-500">{email}</p>}
+          <p className="truncate font-medium text-foreground">{name}</p>
+          {email && <p className="truncate text-sm text-muted-foreground">{email}</p>}
         </div>
         <div className={`rounded-full px-3 py-1 text-xs font-bold ${gradeClasses}`}>
           {grade} · {score}/100
         </div>
       </div>
-      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+      {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
       {outreach && <p className="mt-1 text-xs text-brand-500">💬 {outreach}</p>}
     </div>
   );
@@ -348,10 +348,10 @@ function InvoicesView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-serif text-lg font-semibold text-ink-900">
+        <h3 className="font-serif text-lg font-semibold text-foreground">
           Audited {total} invoice{total === 1 ? '' : 's'}
           {totalValue !== undefined && (
-            <span className="ml-2 text-sm font-normal text-ink-500">
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
               · {formatUSD(totalValue)} total
             </span>
           )}
@@ -361,7 +361,7 @@ function InvoicesView({ result }: { result: Record<string, unknown> }) {
       {/* Agent plan — surfaced to the user as the "what I'm about
           to do" statement, the autonomous-agent giveaway. */}
       {agentPlan && (
-        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-ink-900">
+        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-foreground">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
             🤖 Agent plan
           </p>
@@ -389,7 +389,7 @@ function InvoicesView({ result }: { result: Record<string, unknown> }) {
           </div>
         )}
         {lowConfidence !== undefined && (
-          <div className="rounded bg-cream-200 px-3 py-2 text-ink-700">
+          <div className="rounded bg-muted px-3 py-2 text-foreground/85">
             <div className="text-lg font-bold">{lowConfidence}</div>
             <div>Low confidence</div>
           </div>
@@ -415,13 +415,13 @@ function InvoicesView({ result }: { result: Record<string, unknown> }) {
           <p className="mb-2 text-sm font-semibold text-amber-900">
             🔁 Vendor patterns across this batch
           </p>
-          <ul className="space-y-1.5 text-sm text-ink-900">
+          <ul className="space-y-1.5 text-sm text-foreground">
             {vendorPatterns.map((p, i) => (
               <li key={i}>
                 <span className="font-medium">{stringOr(p.vendor, '—')}</span>
-                <span className="text-ink-700"> — {stringOr(p.pattern, '')}</span>
+                <span className="text-foreground/85"> — {stringOr(p.pattern, '')}</span>
                 {numberOrUndef(p.affectedInvoices) !== undefined && (
-                  <span className="text-ink-500"> ({stringOr(p.affectedInvoices, '')} invoices)</span>
+                  <span className="text-muted-foreground"> ({stringOr(p.affectedInvoices, '')} invoices)</span>
                 )}
                 <p className="ml-3 text-xs text-brand-700">
                   → {stringOr(p.recommendedAction, '')}
@@ -437,15 +437,15 @@ function InvoicesView({ result }: { result: Record<string, unknown> }) {
           <p className="mb-2 text-sm font-semibold text-red-900">
             🚩 Escalations (beyond standard routing)
           </p>
-          <ul className="space-y-1.5 text-sm text-ink-900">
+          <ul className="space-y-1.5 text-sm text-foreground">
             {escalations.map((e, i) => (
               <li key={i}>
                 <span className="font-medium">{stringOr(e.invoiceNumber, '—')}</span>
-                <span className="text-ink-700"> · {stringOr(e.vendor, '—')}</span>
+                <span className="text-foreground/85"> · {stringOr(e.vendor, '—')}</span>
                 <span className="ml-2 text-xs text-red-700">
                   → escalate to {stringOr(e.escalateTo, '')}
                 </span>
-                <p className="text-xs text-ink-700">{stringOr(e.reason, '')}</p>
+                <p className="text-xs text-foreground/85">{stringOr(e.reason, '')}</p>
               </li>
             ))}
           </ul>
@@ -453,11 +453,11 @@ function InvoicesView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {policyRecs.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-cream-50 p-3">
-          <p className="mb-2 text-sm font-semibold text-ink-900">
+        <div className="rounded-lg border border-border bg-background p-3">
+          <p className="mb-2 text-sm font-semibold text-foreground">
             💡 Policy recommendations
           </p>
-          <ul className="space-y-1 text-sm text-ink-700">
+          <ul className="space-y-1 text-sm text-foreground/85">
             {policyRecs.map((r, i) => (
               <li key={i}>• {r}</li>
             ))}
@@ -466,11 +466,11 @@ function InvoicesView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {selfReview && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-500">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             🪞 Agent self-review
           </p>
-          <p className="text-sm italic text-ink-700">{selfReview}</p>
+          <p className="text-sm italic text-foreground/85">{selfReview}</p>
         </div>
       )}
     </div>
@@ -509,11 +509,11 @@ function InvoiceRow({ invoice }: { invoice: Record<string, unknown> }) {
         ? 'text-emerald-700'
         : matchStatus === 'VARIANCE' || matchStatus === 'DUPLICATE'
           ? 'text-red-600'
-          : 'text-ink-500';
+          : 'text-muted-foreground';
   // Confidence colors: ≥85 emerald, 70-84 amber-ish, <70 red-tinted.
   const confidenceClasses =
     confidence === undefined
-      ? 'text-ink-500'
+      ? 'text-muted-foreground'
       : confidence >= 85
         ? 'text-emerald-700'
         : confidence >= 70
@@ -521,14 +521,14 @@ function InvoiceRow({ invoice }: { invoice: Record<string, unknown> }) {
           : 'text-red-700';
 
   return (
-    <div className="rounded-lg border bg-white p-3 transition-shadow hover:shadow-brand-card">
+    <div className="rounded-lg border bg-card p-3 transition-shadow hover:shadow-brand-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-ink-900">
+          <p className="truncate font-medium text-foreground">
             {invoiceNumber}
-            <span className="ml-2 text-sm font-normal text-ink-500">{vendor}</span>
+            <span className="ml-2 text-sm font-normal text-muted-foreground">{vendor}</span>
           </p>
-          <p className="mt-0.5 text-sm text-ink-700">
+          <p className="mt-0.5 text-sm text-foreground/85">
             {amount !== undefined && (
               <span className="font-medium">
                 {currency === 'USD'
@@ -538,11 +538,11 @@ function InvoiceRow({ invoice }: { invoice: Record<string, unknown> }) {
             )}
             {poNumber && (
               <>
-                <span className="mx-2 text-ink-300">·</span>
+                <span className="mx-2 text-muted-foreground/60">·</span>
                 <span>PO {poNumber}</span>
               </>
             )}
-            <span className="mx-2 text-ink-300">·</span>
+            <span className="mx-2 text-muted-foreground/60">·</span>
             <span className={matchClasses}>{formatEnum(matchStatus)}</span>
           </p>
         </div>
@@ -569,7 +569,7 @@ function InvoiceRow({ invoice }: { invoice: Record<string, unknown> }) {
           ))}
         </ul>
       )}
-      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+      {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
       {suggestedAction && (
         <p className="mt-1 text-xs text-brand-500">→ {suggestedAction}</p>
       )}
@@ -580,11 +580,11 @@ function InvoiceRow({ invoice }: { invoice: Record<string, unknown> }) {
       {(approvalDraft || vendorOutreach) && (
         <div className="mt-2 space-y-1.5">
           {approvalDraft && (
-            <details className="rounded border border-cream-200 bg-cream-50 px-2 py-1.5 text-xs">
-              <summary className="cursor-pointer font-medium text-ink-900">
+            <details className="rounded border border-border bg-background px-2 py-1.5 text-xs">
+              <summary className="cursor-pointer font-medium text-foreground">
                 📨 Approval / internal email — paste into your tool
               </summary>
-              <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-ink-700">
+              <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-foreground/85">
                 {approvalDraft}
               </pre>
             </details>
@@ -594,7 +594,7 @@ function InvoiceRow({ invoice }: { invoice: Record<string, unknown> }) {
               <summary className="cursor-pointer font-medium text-brand-700">
                 ✉ Vendor outreach draft — paste verbatim
               </summary>
-              <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-ink-700">
+              <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-foreground/85">
                 {vendorOutreach}
               </pre>
             </details>
@@ -636,16 +636,16 @@ function ProspectsView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-serif text-lg font-semibold text-ink-900">
+        <h3 className="font-serif text-lg font-semibold text-foreground">
           Found {total} prospect{total === 1 ? '' : 's'}
         </h3>
-        {summary && <p className="mt-1 text-sm text-ink-700">{summary}</p>}
+        {summary && <p className="mt-1 text-sm text-foreground/85">{summary}</p>}
       </div>
 
       {/* Agent plan — Level-4 hallmark; surface up-front like a
           status note from the sales agent to the AE. */}
       {agentPlan && (
-        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-ink-900">
+        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-foreground">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
             🤖 Agent plan
           </p>
@@ -667,7 +667,7 @@ function ProspectsView({ result }: { result: Record<string, unknown> }) {
           </div>
         )}
         {cold !== undefined && (
-          <div className="rounded bg-cream-200 px-3 py-2 text-ink-700">
+          <div className="rounded bg-muted px-3 py-2 text-foreground/85">
             <div className="text-lg font-bold">{cold}</div>
             <div>COLD</div>
           </div>
@@ -691,7 +691,7 @@ function ProspectsView({ result }: { result: Record<string, unknown> }) {
           <p className="mb-2 text-sm font-semibold text-brand-700">
             🔭 Cross-batch insights
           </p>
-          <ul className="space-y-1 text-sm text-ink-900">
+          <ul className="space-y-1 text-sm text-foreground">
             {insights.map((s, i) => (
               <li key={i}>• {s}</li>
             ))}
@@ -700,11 +700,11 @@ function ProspectsView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {selfReview && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-500">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             🪞 Agent self-review
           </p>
-          <p className="text-sm italic text-ink-700">{selfReview}</p>
+          <p className="text-sm italic text-foreground/85">{selfReview}</p>
         </div>
       )}
     </div>
@@ -741,7 +741,7 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
 
   const confidenceClasses =
     confidence === undefined
-      ? 'text-ink-500'
+      ? 'text-muted-foreground'
       : confidence >= 85
         ? 'text-emerald-700'
         : confidence >= 70
@@ -763,13 +763,13 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
       ? 'bg-brand-500 text-white'
       : grade === 'WARM'
         ? 'bg-amber-100 text-amber-800'
-        : 'bg-cream-200 text-ink-700';
+        : 'bg-muted text-foreground/85';
 
   return (
-    <div className="rounded-lg border bg-white p-4 transition-shadow hover:shadow-brand-card">
+    <div className="rounded-lg border bg-card p-4 transition-shadow hover:shadow-brand-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 font-medium text-ink-900">
+          <p className="flex items-center gap-2 font-medium text-foreground">
             <span className="truncate">{name}</span>
             {underTheRadar && (
               <span
@@ -780,7 +780,7 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
               </span>
             )}
           </p>
-          <p className="mt-0.5 text-sm text-ink-700">
+          <p className="mt-0.5 text-sm text-foreground/85">
             {[hqCity && `${hqCity}, ${hqCountry}`.replace(/^, /, ''), hqCountry && !hqCity ? hqCountry : '', industry, fundingStage]
               .filter(Boolean)
               .join(' · ')}
@@ -814,30 +814,30 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
       </div>
 
       {/* India presence block — the actual GCC verification */}
-      <div className="mt-3 rounded-lg bg-cream-50 p-2.5 text-xs text-ink-700">
-        <div className="flex items-center gap-2 font-medium text-ink-900">
+      <div className="mt-3 rounded-lg bg-background p-2.5 text-xs text-foreground/85">
+        <div className="flex items-center gap-2 font-medium text-foreground">
           <span>🌏</span>
           <span>India presence</span>
         </div>
         <div className="mt-1 space-y-0.5">
           {cities.length > 0 && (
             <div>
-              <span className="text-ink-500">Cities:</span>{' '}
+              <span className="text-muted-foreground">Cities:</span>{' '}
               <span className="font-medium">{cities.join(', ')}</span>
             </div>
           )}
           {indiaTeamSize && (
             <div>
-              <span className="text-ink-500">Team size:</span>{' '}
+              <span className="text-muted-foreground">Team size:</span>{' '}
               <span className="font-medium">{indiaTeamSize}</span>
             </div>
           )}
           {openRoles !== undefined && (
             <div>
-              <span className="text-ink-500">Open eng roles:</span>{' '}
+              <span className="text-muted-foreground">Open eng roles:</span>{' '}
               <span className="font-medium">{openRoles}</span>
               {sampleRoles.length > 0 && (
-                <span className="text-ink-500"> — {sampleRoles.slice(0, 3).join(', ')}</span>
+                <span className="text-muted-foreground"> — {sampleRoles.slice(0, 3).join(', ')}</span>
               )}
             </div>
           )}
@@ -855,13 +855,13 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
       </div>
 
       {signals.length > 0 && (
-        <ul className="mt-2 space-y-0.5 text-xs text-ink-700">
+        <ul className="mt-2 space-y-0.5 text-xs text-foreground/85">
           {signals.map((s, i) => (
             <li key={i}>• {s}</li>
           ))}
         </ul>
       )}
-      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+      {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
 
       {/* Paste-ready outreach + follow-up research — the Level-4
           additions. Outreach is collapsed by default; the AE opens
@@ -871,7 +871,7 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
           <summary className="cursor-pointer font-medium text-brand-700">
             ✉ First-touch outreach — paste-ready
           </summary>
-          <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-ink-700">
+          <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-foreground/85">
             {outreach}
           </pre>
         </details>
@@ -880,7 +880,7 @@ function ProspectRow({ prospect }: { prospect: Record<string, unknown> }) {
       {followUps.length > 0 && (
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs">
           <p className="font-medium text-amber-800">🔍 Verify before sending</p>
-          <ul className="mt-0.5 space-y-0.5 text-ink-700">
+          <ul className="mt-0.5 space-y-0.5 text-foreground/85">
             {followUps.map((f, i) => (
               <li key={i}>· {f}</li>
             ))}
@@ -920,18 +920,18 @@ function VendorsView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-serif text-lg font-semibold text-ink-900">
+        <h3 className="font-serif text-lg font-semibold text-foreground">
           Reviewed {total} vendor{total === 1 ? '' : 's'}
           {period && (
-            <span className="ml-2 text-sm font-normal text-ink-500">· {period}</span>
+            <span className="ml-2 text-sm font-normal text-muted-foreground">· {period}</span>
           )}
           {totalSpend !== undefined && (
-            <span className="ml-2 text-sm font-normal text-ink-500">
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
               · {formatNumberCompact(totalSpend)} total spend
             </span>
           )}
         </h3>
-        {summary && <p className="mt-1 text-sm text-ink-700">{summary}</p>}
+        {summary && <p className="mt-1 text-sm text-foreground/85">{summary}</p>}
       </div>
 
       <div className="grid grid-cols-4 gap-2 text-xs font-medium">
@@ -962,7 +962,7 @@ function VendorsView({ result }: { result: Record<string, unknown> }) {
       </div>
 
       {newCount !== undefined && newCount > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-cream-50 px-3 py-2 text-xs text-ink-700">
+        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground/85">
           ✨ {newCount} new vendor{newCount === 1 ? '' : 's'} in this period —
           tracked on probation until a full quarter of data lands.
         </div>
@@ -1029,16 +1029,16 @@ function VendorRow({ vendor }: { vendor: Record<string, unknown> }) {
       ? 'text-emerald-600'
       : trend === 'DECLINING'
         ? 'text-red-600'
-        : 'text-ink-500';
+        : 'text-muted-foreground';
 
   return (
-    <div className="rounded-lg border bg-white p-3 transition-shadow hover:shadow-brand-card">
+    <div className="rounded-lg border bg-card p-3 transition-shadow hover:shadow-brand-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 font-medium text-ink-900">
+          <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
             <span className="truncate">{name}</span>
             {vendorId && (
-              <span className="text-xs font-normal text-ink-500">#{vendorId}</span>
+              <span className="text-xs font-normal text-muted-foreground">#{vendorId}</span>
             )}
             {isStrategic && (
               <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
@@ -1051,7 +1051,7 @@ function VendorRow({ vendor }: { vendor: Record<string, unknown> }) {
               </span>
             )}
           </p>
-          <p className="mt-0.5 text-sm text-ink-700">
+          <p className="mt-0.5 text-sm text-foreground/85">
             {[
               category,
               spend !== undefined &&
@@ -1101,14 +1101,14 @@ function VendorRow({ vendor }: { vendor: Record<string, unknown> }) {
           ))}
         </ul>
       )}
-      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+      {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
       {action && (
         <p className="mt-2 rounded bg-brand-50 px-2 py-1 text-xs text-brand-700">
           → <span className="font-medium">Recommended:</span> {action}
         </p>
       )}
       {reviewNotes && (
-        <p className="mt-1 text-xs italic text-ink-500">📝 {reviewNotes}</p>
+        <p className="mt-1 text-xs italic text-muted-foreground">📝 {reviewNotes}</p>
       )}
     </div>
   );
@@ -1116,8 +1116,8 @@ function VendorRow({ vendor }: { vendor: Record<string, unknown> }) {
 
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
-    <span className="inline-flex items-baseline gap-1 rounded bg-cream-100 px-1.5 py-0.5 text-ink-700">
-      <span className="text-ink-500">{label}:</span>
+    <span className="inline-flex items-baseline gap-1 rounded bg-background px-1.5 py-0.5 text-foreground/85">
+      <span className="text-muted-foreground">{label}:</span>
       <span className="font-medium">{value}</span>
     </span>
   );
@@ -1157,15 +1157,15 @@ function CandidatesView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-serif text-lg font-semibold text-ink-900">
+        <h3 className="font-serif text-lg font-semibold text-foreground">
           Screened {total} candidate{total === 1 ? '' : 's'}
           {jobTitle && (
-            <span className="ml-2 text-sm font-normal text-ink-500">
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
               · {jobTitle}
             </span>
           )}
         </h3>
-        {summary && <p className="mt-1 text-sm text-ink-700">{summary}</p>}
+        {summary && <p className="mt-1 text-sm text-foreground/85">{summary}</p>}
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-xs font-medium">
@@ -1182,7 +1182,7 @@ function CandidatesView({ result }: { result: Record<string, unknown> }) {
           </div>
         )}
         {reject !== undefined && (
-          <div className="rounded bg-cream-200 px-3 py-2 text-ink-700">
+          <div className="rounded bg-muted px-3 py-2 text-foreground/85">
             <div className="text-lg font-bold">{reject}</div>
             <div>Polite no</div>
           </div>
@@ -1233,23 +1233,23 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
       ? 'bg-emerald-100 text-emerald-700'
       : grade === 'REVIEW'
         ? 'bg-amber-100 text-amber-800'
-        : 'bg-ink-300/40 text-ink-700';
+        : 'bg-ink-300/40 text-foreground/85';
   const gradeLabel =
     grade === 'SHORTLIST' ? 'SHORTLIST' : grade === 'REVIEW' ? 'REVIEW' : 'POLITE NO';
 
   return (
-    <div className="rounded-lg border bg-white p-3 transition-shadow hover:shadow-brand-card">
+    <div className="rounded-lg border bg-card p-3 transition-shadow hover:shadow-brand-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 font-medium text-ink-900">
+          <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
             <span className="truncate">{name}</span>
             {filename && (
-              <span className="text-xs font-normal text-ink-500">
+              <span className="text-xs font-normal text-muted-foreground">
                 📄 {filename}
               </span>
             )}
           </p>
-          <p className="mt-0.5 text-sm text-ink-700">
+          <p className="mt-0.5 text-sm text-foreground/85">
             {[
               title && company ? `${title} @ ${company}` : title || company,
               yrs !== undefined && `${yrs.toFixed(yrs % 1 === 0 ? 0 : 1)} yrs exp`,
@@ -1259,7 +1259,7 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
               .join(' · ')}
           </p>
           {(email || phone) && (
-            <p className="mt-0.5 text-xs text-ink-500">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {[email, phone].filter(Boolean).join(' · ')}
             </p>
           )}
@@ -1274,7 +1274,7 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
           <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">
             Strengths
           </p>
-          <ul className="mt-0.5 space-y-0.5 text-xs text-ink-700">
+          <ul className="mt-0.5 space-y-0.5 text-xs text-foreground/85">
             {strengths.map((s, i) => (
               <li key={i}>✓ {s}</li>
             ))}
@@ -1287,7 +1287,7 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
           <p className="text-[11px] font-medium uppercase tracking-wide text-amber-700">
             Gaps
           </p>
-          <ul className="mt-0.5 space-y-0.5 text-xs text-ink-700">
+          <ul className="mt-0.5 space-y-0.5 text-xs text-foreground/85">
             {gaps.map((s, i) => (
               <li key={i}>· {s}</li>
             ))}
@@ -1308,14 +1308,14 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
         </div>
       )}
 
-      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+      {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
 
       {interviewQs.length > 0 && (
         <details className="mt-2 group">
           <summary className="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700">
             Suggested interview questions ({interviewQs.length})
           </summary>
-          <ol className="mt-1.5 ml-4 list-decimal space-y-1 text-xs text-ink-700">
+          <ol className="mt-1.5 ml-4 list-decimal space-y-1 text-xs text-foreground/85">
             {interviewQs.map((q, i) => (
               <li key={i}>{q}</li>
             ))}
@@ -1329,7 +1329,7 @@ function CandidateRow({ candidate }: { candidate: Record<string, unknown> }) {
         </p>
       )}
       {nextStep && (
-        <p className="mt-1 text-xs italic text-ink-500">→ {nextStep}</p>
+        <p className="mt-1 text-xs italic text-muted-foreground">→ {nextStep}</p>
       )}
     </div>
   );
@@ -1375,7 +1375,7 @@ function AccountsView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-serif text-lg font-semibold text-ink-900">
+        <h3 className="font-serif text-lg font-semibold text-foreground">
           Triaged {total} account{total === 1 ? '' : 's'}
           {arrAtRisk !== undefined && arrAtRisk > 0 && (
             <span className="ml-2 text-sm font-normal text-red-700">
@@ -1383,11 +1383,11 @@ function AccountsView({ result }: { result: Record<string, unknown> }) {
             </span>
           )}
         </h3>
-        {summary && <p className="mt-1 text-sm text-ink-700">{summary}</p>}
+        {summary && <p className="mt-1 text-sm text-foreground/85">{summary}</p>}
       </div>
 
       {plan && (
-        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-ink-900">
+        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-foreground">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
             🤖 Agent plan
           </p>
@@ -1433,7 +1433,7 @@ function AccountsView({ result }: { result: Record<string, unknown> }) {
           <p className="mb-2 text-sm font-semibold text-brand-700">
             🔭 Top churn drivers across the portfolio
           </p>
-          <ul className="space-y-1 text-sm text-ink-900">
+          <ul className="space-y-1 text-sm text-foreground">
             {drivers.map((s, i) => (
               <li key={i}>• {s}</li>
             ))}
@@ -1442,18 +1442,18 @@ function AccountsView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {playDist.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-2 text-sm font-semibold text-ink-900">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-2 text-sm font-semibold text-foreground">
             🛟 Save-play distribution
           </p>
-          <ul className="space-y-1 text-sm text-ink-700">
+          <ul className="space-y-1 text-sm text-foreground/85">
             {playDist.map((p, i) => {
               const play = stringOr(p.play, '');
               const count = numberOrUndef(p.accountCount) ?? 0;
               return (
                 <li key={i} className="flex items-baseline justify-between gap-3">
                   <span>{play}</span>
-                  <span className="font-medium text-ink-900">
+                  <span className="font-medium text-foreground">
                     {count} {count === 1 ? 'account' : 'accounts'}
                   </span>
                 </li>
@@ -1464,11 +1464,11 @@ function AccountsView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {selfReview && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-500">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             🪞 Agent self-review
           </p>
-          <p className="text-sm italic text-ink-700">{selfReview}</p>
+          <p className="text-sm italic text-foreground/85">{selfReview}</p>
         </div>
       )}
     </div>
@@ -1519,7 +1519,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
 
   const confidenceClasses =
     confidence === undefined
-      ? 'text-ink-500'
+      ? 'text-muted-foreground'
       : confidence >= 85
         ? 'text-emerald-700'
         : confidence >= 70
@@ -1527,13 +1527,13 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
           : 'text-red-700';
 
   return (
-    <div className="rounded-lg border bg-white p-3 transition-shadow hover:shadow-brand-card">
+    <div className="rounded-lg border bg-card p-3 transition-shadow hover:shadow-brand-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 font-medium text-ink-900">
+          <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
             <span className="truncate">{name}</span>
             {accountId && (
-              <span className="text-xs font-normal text-ink-500">#{accountId}</span>
+              <span className="text-xs font-normal text-muted-foreground">#{accountId}</span>
             )}
             {isStrategic && (
               <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
@@ -1546,7 +1546,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
               </span>
             )}
           </p>
-          <p className="mt-0.5 text-sm text-ink-700">
+          <p className="mt-0.5 text-sm text-foreground/85">
             {[
               tier,
               arr !== undefined && `${formatNumberCompact(arr)} ARR`,
@@ -1580,7 +1580,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
           <p className="text-[11px] font-medium uppercase tracking-wide text-red-700">
             Risk drivers
           </p>
-          <ul className="mt-0.5 space-y-0.5 text-xs text-ink-700">
+          <ul className="mt-0.5 space-y-0.5 text-xs text-foreground/85">
             {drivers.map((s, i) => (
               <li key={i}>⚠ {s}</li>
             ))}
@@ -1593,7 +1593,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
           <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">
             Working in your favor
           </p>
-          <ul className="mt-0.5 space-y-0.5 text-xs text-ink-700">
+          <ul className="mt-0.5 space-y-0.5 text-xs text-foreground/85">
             {positives.map((s, i) => (
               <li key={i}>✓ {s}</li>
             ))}
@@ -1601,16 +1601,16 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
         </div>
       )}
 
-      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+      {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
 
       {play && (
         <div className="mt-2 rounded border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs">
           <span className="font-medium text-brand-700">
             🛟 Recommended save play:
           </span>{' '}
-          <span className="text-ink-900">{play}</span>
+          <span className="text-foreground">{play}</span>
           {escalateTo && (
-            <span className="ml-2 text-ink-500">→ escalate to {escalateTo}</span>
+            <span className="ml-2 text-muted-foreground">→ escalate to {escalateTo}</span>
           )}
         </div>
       )}
@@ -1620,7 +1620,7 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
           <summary className="cursor-pointer font-medium text-brand-700">
             ✉ Draft retention email — paste-ready
           </summary>
-          <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-ink-700">
+          <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-foreground/85">
             {email}
           </pre>
         </details>
@@ -1628,10 +1628,10 @@ function AccountRow({ account }: { account: Record<string, unknown> }) {
 
       {followUps.length > 0 && (
         <details className="mt-2 group">
-          <summary className="cursor-pointer text-xs font-medium text-ink-700 hover:text-brand-600">
+          <summary className="cursor-pointer text-xs font-medium text-foreground/85 hover:text-brand-600">
             Questions for the next CSM conversation ({followUps.length})
           </summary>
-          <ol className="mt-1.5 ml-4 list-decimal space-y-1 text-xs text-ink-700">
+          <ol className="mt-1.5 ml-4 list-decimal space-y-1 text-xs text-foreground/85">
             {followUps.map((q, i) => (
               <li key={i}>{q}</li>
             ))}
@@ -1700,7 +1700,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
   // used in the agent's own scoring rubric.
   const winClasses =
     winProb === undefined
-      ? 'bg-cream-200 text-ink-700'
+      ? 'bg-muted text-foreground/85'
       : winProb >= 70
         ? 'bg-emerald-100 text-emerald-700'
         : winProb >= 40
@@ -1708,7 +1708,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
           : 'bg-red-100 text-red-700';
   const confidenceClasses =
     confidence === undefined
-      ? 'text-ink-500'
+      ? 'text-muted-foreground'
       : confidence >= 85
         ? 'text-emerald-700'
         : confidence >= 70
@@ -1720,9 +1720,9 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       {/* ---- Header: title + recipient + the agent's win-probability call ---- */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="font-serif text-lg font-semibold text-ink-900">{title}</h3>
+          <h3 className="font-serif text-lg font-semibold text-foreground">{title}</h3>
           {(recipientName || recipientCompany) && (
-            <p className="mt-0.5 text-sm text-ink-700">
+            <p className="mt-0.5 text-sm text-foreground/85">
               {recipientName && <>For <span className="font-medium">{recipientName}</span></>}
               {recipientName && recipientCompany && ' · '}
               {recipientCompany && <span>{recipientCompany}</span>}
@@ -1750,7 +1750,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       </div>
 
       {plan && (
-        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-ink-900">
+        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-foreground">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
             🤖 Agent plan
           </p>
@@ -1760,28 +1760,28 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
 
       {execSummary && (
         <div>
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-500">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Executive summary
           </p>
-          <p className="text-sm leading-relaxed text-ink-900">{execSummary}</p>
+          <p className="text-sm leading-relaxed text-foreground">{execSummary}</p>
         </div>
       )}
 
       {problem && (
         <div>
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-500">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Understanding of the problem
           </p>
-          <p className="text-sm leading-relaxed text-ink-700">{problem}</p>
+          <p className="text-sm leading-relaxed text-foreground/85">{problem}</p>
         </div>
       )}
 
       {scope.length > 0 && (
         <div>
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-500">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Proposed scope
           </p>
-          <ul className="space-y-1 text-sm text-ink-900">
+          <ul className="space-y-1 text-sm text-foreground">
             {scope.map((s, i) => (
               <li key={i} className="flex gap-2">
                 <span className="text-brand-500">▸</span>
@@ -1793,9 +1793,9 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {pricingTable.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
+        <div className="rounded-lg border border-border bg-card p-3">
           <div className="mb-2 flex items-baseline justify-between gap-3">
-            <p className="text-sm font-semibold text-ink-900">💰 Pricing</p>
+            <p className="text-sm font-semibold text-foreground">💰 Pricing</p>
             {pricingTotal !== undefined && pricingTotal > 0 && (
               <p className="text-sm font-semibold text-brand-700">
                 {currency} {formatNumberCompact(pricingTotal)}
@@ -1804,8 +1804,8 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="text-ink-500">
-                <tr className="border-b border-cream-200 text-left">
+              <thead className="text-muted-foreground">
+                <tr className="border-b border-border text-left">
                   <th className="py-1 pr-3 font-medium">Item</th>
                   <th className="py-1 pr-3 font-medium">Qty</th>
                   <th className="py-1 pr-3 font-medium">Unit</th>
@@ -1822,21 +1822,21 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
                   const lineTotal = numberOrUndef(row.lineTotal);
                   const notes = stringOr(row.notes, '');
                   return (
-                    <tr key={i} className="border-b border-cream-100 last:border-0 align-top">
-                      <td className="py-1.5 pr-3 text-ink-900">
+                    <tr key={i} className="border-b border-border last:border-0 align-top">
+                      <td className="py-1.5 pr-3 text-foreground">
                         {desc}
                         {notes && (
-                          <span className="mt-0.5 block text-[11px] italic text-ink-500">
+                          <span className="mt-0.5 block text-[11px] italic text-muted-foreground">
                             {notes}
                           </span>
                         )}
                       </td>
-                      <td className="py-1.5 pr-3 text-ink-700">{qty ?? '—'}</td>
-                      <td className="py-1.5 pr-3 text-ink-700">{unit || '—'}</td>
-                      <td className="py-1.5 pr-3 text-right text-ink-700">
+                      <td className="py-1.5 pr-3 text-foreground/85">{qty ?? '—'}</td>
+                      <td className="py-1.5 pr-3 text-foreground/85">{unit || '—'}</td>
+                      <td className="py-1.5 pr-3 text-right text-foreground/85">
                         {unitPrice !== undefined ? formatUSD(unitPrice) : '—'}
                       </td>
-                      <td className="py-1.5 text-right font-medium text-ink-900">
+                      <td className="py-1.5 text-right font-medium text-foreground">
                         {lineTotal !== undefined ? formatUSD(lineTotal) : '—'}
                       </td>
                     </tr>
@@ -1846,7 +1846,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
             </table>
           </div>
           {pricingNotes && (
-            <p className="mt-2 text-[11px] italic text-ink-500">{pricingNotes}</p>
+            <p className="mt-2 text-[11px] italic text-muted-foreground">{pricingNotes}</p>
           )}
           {discountPct !== undefined && discountPct > 0 && (
             <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
@@ -1858,9 +1858,9 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {timeline.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-2 text-sm font-semibold text-ink-900">🗓 Timeline</p>
-          <ol className="space-y-1.5 text-sm text-ink-900">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-2 text-sm font-semibold text-foreground">🗓 Timeline</p>
+          <ol className="space-y-1.5 text-sm text-foreground">
             {timeline.map((m, i) => {
               const name = stringOr(m.name, `Milestone ${i + 1}`);
               const weeks = numberOrUndef(m.durationWeeks);
@@ -1874,13 +1874,13 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
                     <p className="font-medium">
                       {name}
                       {weeks !== undefined && (
-                        <span className="ml-2 text-xs font-normal text-ink-500">
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
                           {weeks} {weeks === 1 ? 'week' : 'weeks'}
                         </span>
                       )}
                     </p>
                     {deliverable && (
-                      <p className="text-xs text-ink-700">{deliverable}</p>
+                      <p className="text-xs text-foreground/85">{deliverable}</p>
                     )}
                   </div>
                 </li>
@@ -1893,7 +1893,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       {whyUs.length > 0 && (
         <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
           <p className="mb-1 text-sm font-semibold text-brand-700">⭐ Why us</p>
-          <ul className="space-y-1 text-sm text-ink-900">
+          <ul className="space-y-1 text-sm text-foreground">
             {whyUs.map((s, i) => (
               <li key={i}>• {s}</li>
             ))}
@@ -1902,11 +1902,11 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {assumptions.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-cream-50 p-3">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-500">
+        <div className="rounded-lg border border-border bg-background p-3">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Assumptions
           </p>
-          <ul className="space-y-0.5 text-xs text-ink-700">
+          <ul className="space-y-0.5 text-xs text-foreground/85">
             {assumptions.map((s, i) => (
               <li key={i}>• {s}</li>
             ))}
@@ -1915,8 +1915,8 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {risks.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-2 text-sm font-semibold text-ink-900">⚠ Risks + mitigations</p>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-2 text-sm font-semibold text-foreground">⚠ Risks + mitigations</p>
           <ul className="space-y-1.5 text-sm">
             {risks.map((r, i) => {
               const risk = stringOr(r.risk, '');
@@ -1925,7 +1925,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
                 <li key={i} className="rounded bg-amber-50 px-2 py-1.5">
                   <p className="font-medium text-amber-900">{risk}</p>
                   {mitigation && (
-                    <p className="mt-0.5 text-xs text-ink-700">
+                    <p className="mt-0.5 text-xs text-foreground/85">
                       <span className="font-medium text-emerald-700">Mitigation:</span>{' '}
                       {mitigation}
                     </p>
@@ -1938,9 +1938,9 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {nextSteps.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-1 text-sm font-semibold text-ink-900">→ Next steps</p>
-          <ol className="ml-4 list-decimal space-y-0.5 text-sm text-ink-900">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-1 text-sm font-semibold text-foreground">→ Next steps</p>
+          <ol className="ml-4 list-decimal space-y-0.5 text-sm text-foreground">
             {nextSteps.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
@@ -1953,7 +1953,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
           <summary className="cursor-pointer text-sm font-semibold text-brand-700">
             ✉ Paste-ready cover email
           </summary>
-          <pre className="mt-2 whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-900">
+          <pre className="mt-2 whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">
             {coverEmail}
           </pre>
         </details>
@@ -1964,7 +1964,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
             🔄 Alternative approach (if they push back)
           </p>
-          <p className="text-sm italic text-ink-900">{altApproach}</p>
+          <p className="text-sm italic text-foreground">{altApproach}</p>
         </div>
       )}
 
@@ -1973,7 +1973,7 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
           <p className="mb-1 text-sm font-semibold text-amber-900">
             ❓ Ask the prospect before sending
           </p>
-          <ul className="space-y-0.5 text-sm text-ink-900">
+          <ul className="space-y-0.5 text-sm text-foreground">
             {gaps.map((s, i) => (
               <li key={i}>• {s}</li>
             ))}
@@ -1982,11 +1982,11 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {selfReview && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-500">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             🪞 Agent self-review
           </p>
-          <p className="text-sm italic text-ink-700">{selfReview}</p>
+          <p className="text-sm italic text-foreground/85">{selfReview}</p>
         </div>
       )}
     </div>
@@ -2030,7 +2030,7 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-serif text-lg font-semibold text-ink-900">
+        <h3 className="font-serif text-lg font-semibold text-foreground">
           Triaged {total} invoice{total === 1 ? '' : 's'}
           {overdueAR !== undefined && overdueAR > 0 && (
             <span className="ml-2 text-sm font-normal text-red-700">
@@ -2038,11 +2038,11 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
             </span>
           )}
         </h3>
-        {summary && <p className="mt-1 text-sm text-ink-700">{summary}</p>}
+        {summary && <p className="mt-1 text-sm text-foreground/85">{summary}</p>}
       </div>
 
       {plan && (
-        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-ink-900">
+        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-foreground">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
             🤖 Agent plan
           </p>
@@ -2058,11 +2058,11 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
           </div>
         )}
         {openAR !== undefined && (
-          <div className="rounded bg-cream-50 px-3 py-2 text-ink-900">
+          <div className="rounded bg-background px-3 py-2 text-foreground">
             <div className="text-lg font-bold">
               {currency} {formatNumberCompact(openAR)}
             </div>
-            <div className="text-ink-700">Total open AR</div>
+            <div className="text-foreground/85">Total open AR</div>
           </div>
         )}
         {overdueAR !== undefined && (
@@ -2076,9 +2076,9 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
       </div>
 
       {buckets.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-2 text-sm font-semibold text-ink-900">📊 Aging breakdown</p>
-          <ul className="space-y-1 text-sm text-ink-700">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-2 text-sm font-semibold text-foreground">📊 Aging breakdown</p>
+          <ul className="space-y-1 text-sm text-foreground/85">
             {buckets.map((b, i) => {
               const label = stringOr(b.bucket, '');
               const count = numberOrUndef(b.invoiceCount) ?? 0;
@@ -2086,7 +2086,7 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
               return (
                 <li key={i} className="flex items-baseline justify-between gap-3">
                   <span>{label}</span>
-                  <span className="text-ink-900">
+                  <span className="text-foreground">
                     {count} {count === 1 ? 'invoice' : 'invoices'}
                     <span className="ml-2 font-medium">
                       {currency} {formatNumberCompact(amt)}
@@ -2110,7 +2110,7 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
           <p className="mb-2 text-sm font-semibold text-brand-700">
             🔭 Top collection risks
           </p>
-          <ul className="space-y-1 text-sm text-ink-900">
+          <ul className="space-y-1 text-sm text-foreground">
             {risks.map((s, i) => (
               <li key={i}>• {s}</li>
             ))}
@@ -2119,11 +2119,11 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {actions.length > 0 && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-2 text-sm font-semibold text-ink-900">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-2 text-sm font-semibold text-foreground">
             🛠 Action distribution
           </p>
-          <ul className="space-y-1 text-sm text-ink-700">
+          <ul className="space-y-1 text-sm text-foreground/85">
             {actions.map((a, i) => {
               const action = stringOr(a.action, '');
               const count = numberOrUndef(a.invoiceCount) ?? 0;
@@ -2131,7 +2131,7 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
               return (
                 <li key={i} className="flex items-baseline justify-between gap-3">
                   <span>{action}</span>
-                  <span className="font-medium text-ink-900">
+                  <span className="font-medium text-foreground">
                     {count} · {currency} {formatNumberCompact(amt)}
                   </span>
                 </li>
@@ -2142,11 +2142,11 @@ function ReceivablesView({ result }: { result: Record<string, unknown> }) {
       )}
 
       {selfReview && (
-        <div className="rounded-lg border border-cream-200 bg-white p-3">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-500">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             🪞 Agent self-review
           </p>
-          <p className="text-sm italic text-ink-700">{selfReview}</p>
+          <p className="text-sm italic text-foreground/85">{selfReview}</p>
         </div>
       )}
     </div>
@@ -2186,7 +2186,7 @@ function ReceivableRow({
 
   const gradeClasses =
     grade === 'WRITE_OFF'
-      ? 'bg-ink-200 text-ink-900'
+      ? 'bg-muted text-foreground'
       : grade === 'CRITICAL'
         ? 'bg-red-100 text-red-700'
         : grade === 'OVERDUE'
@@ -2208,7 +2208,7 @@ function ReceivableRow({
 
   const confidenceClasses =
     confidence === undefined
-      ? 'text-ink-500'
+      ? 'text-muted-foreground'
       : confidence >= 85
         ? 'text-emerald-700'
         : confidence >= 70
@@ -2216,12 +2216,12 @@ function ReceivableRow({
           : 'text-red-700';
 
   return (
-    <div className="rounded-lg border bg-white p-3 transition-shadow hover:shadow-brand-card">
+    <div className="rounded-lg border bg-card p-3 transition-shadow hover:shadow-brand-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 font-medium text-ink-900">
+          <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
             <span className="truncate">{customer}</span>
-            <span className="text-xs font-normal text-ink-500">#{id}</span>
+            <span className="text-xs font-normal text-muted-foreground">#{id}</span>
             {isStrategic && (
               <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
                 strategic
@@ -2233,7 +2233,7 @@ function ReceivableRow({
               </span>
             )}
           </p>
-          <p className="mt-0.5 text-sm text-ink-700">
+          <p className="mt-0.5 text-sm text-foreground/85">
             {[
               `${currency} ${formatNumberCompact(amount)}`,
               dueDate && `due ${dueDate}`,
@@ -2265,7 +2265,7 @@ function ReceivableRow({
         </div>
       </div>
 
-      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+      {reasoning && <p className="mt-2 text-sm text-foreground/85">{reasoning}</p>}
 
       {termsDeviation && (
         <p className="mt-1.5 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
@@ -2276,9 +2276,9 @@ function ReceivableRow({
       {action && (
         <div className="mt-2 rounded border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs">
           <span className="font-medium text-brand-700">🛠 Recommended action:</span>{' '}
-          <span className="text-ink-900">{action}</span>
+          <span className="text-foreground">{action}</span>
           {escalateTo && (
-            <span className="ml-2 text-ink-500">→ escalate to {escalateTo}</span>
+            <span className="ml-2 text-muted-foreground">→ escalate to {escalateTo}</span>
           )}
         </div>
       )}
@@ -2288,7 +2288,7 @@ function ReceivableRow({
           <summary className="cursor-pointer font-medium text-brand-700">
             ✉ Draft dunning email — paste-ready
           </summary>
-          <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-ink-700">
+          <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-foreground/85">
             {email}
           </pre>
         </details>
@@ -2296,10 +2296,10 @@ function ReceivableRow({
 
       {followUps.length > 0 && (
         <details className="mt-2 group">
-          <summary className="cursor-pointer text-xs font-medium text-ink-700 hover:text-brand-600">
+          <summary className="cursor-pointer text-xs font-medium text-foreground/85 hover:text-brand-600">
             Questions if customer responds ({followUps.length})
           </summary>
-          <ol className="mt-1.5 ml-4 list-decimal space-y-1 text-xs text-ink-700">
+          <ol className="mt-1.5 ml-4 list-decimal space-y-1 text-xs text-foreground/85">
             {followUps.map((q, i) => (
               <li key={i}>{q}</li>
             ))}
@@ -2312,7 +2312,7 @@ function ReceivableRow({
 
 function GenericJsonView({ result }: { result: Record<string, unknown> }) {
   return (
-    <pre className="max-h-96 overflow-auto rounded bg-cream-50 p-3 text-xs text-ink-700">
+    <pre className="max-h-96 overflow-auto rounded bg-background p-3 text-xs text-foreground/85">
       {JSON.stringify(result, null, 2)}
     </pre>
   );
@@ -2355,7 +2355,7 @@ export function GateForm({
                 name={field.name}
                 required={field.required}
                 disabled={busy}
-                className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 disabled:bg-cream-200"
+                className="w-full rounded-lg border bg-card px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 disabled:bg-muted"
                 defaultValue=""
               >
                 <option value="" disabled>
@@ -2374,7 +2374,7 @@ export function GateForm({
                 placeholder={field.label}
                 required={field.required}
                 disabled={busy}
-                className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 disabled:bg-cream-200"
+                className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 disabled:bg-muted"
               />
             )}
           </div>
@@ -2387,7 +2387,7 @@ export function GateForm({
           {busy ? 'Unlocking…' : gate.ctaText}
         </button>
       </form>
-      <p className="mt-2 text-center text-xs text-ink-500">No spam. Unsubscribe anytime.</p>
+      <p className="mt-2 text-center text-xs text-muted-foreground">No spam. Unsubscribe anytime.</p>
     </div>
   );
 }

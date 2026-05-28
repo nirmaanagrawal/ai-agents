@@ -613,14 +613,14 @@ export default function AgentChat({ agents, initialAgentSlug, lockedToAgent }: A
   // ----- Render -----------------------------------------------------------
   if (!selectedAgent) {
     return (
-      <div className="flex h-screen items-center justify-center text-ink-500">
+      <div className="flex h-screen items-center justify-center text-muted-foreground">
         No agents available.
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen flex-col bg-cream-100">
+    <div className="flex h-screen flex-col bg-background">
       <BrandBar />
       <Header
         agents={agents}
@@ -719,7 +719,7 @@ export default function AgentChat({ agents, initialAgentSlug, lockedToAgent }: A
  */
 function BrandBar() {
   return (
-    <div className="border-b border-cream-200 bg-cream-50/80 backdrop-blur-sm">
+    <div className="border-b border-border bg-background/80 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-3.5">
         {/* Logo + wordmark — clickable cluster routes back to the
             marketplace grid. Matches the brand bar on the landing
@@ -735,10 +735,10 @@ function BrandBar() {
             alt="Beanbag AI"
             className="h-7 w-7 shrink-0 object-contain transition-transform group-hover:scale-105"
           />
-          <span className="text-sm font-semibold tracking-tight text-ink-900 transition-colors group-hover:text-brand-600">
+          <span className="text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:text-brand-600">
             Beanbag AI
           </span>
-          <span className="hidden text-xs text-ink-500 sm:inline">
+          <span className="hidden text-xs text-muted-foreground sm:inline">
             · Agent marketplace
           </span>
         </a>
@@ -746,7 +746,7 @@ function BrandBar() {
           href="https://www.beanbag.ai"
           target="_blank"
           rel="noreferrer"
-          className="text-xs font-medium text-ink-700 transition-colors hover:text-brand-600"
+          className="text-xs font-medium text-foreground/85 transition-colors hover:text-brand-600"
         >
           beanbag.ai ↗
         </a>
@@ -773,7 +773,7 @@ function Header({
   lockedToAgent: boolean;
 }) {
   return (
-    <header className="border-b border-cream-200 bg-white">
+    <header className="border-b border-border bg-card">
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-4">
         <div className="flex min-w-0 items-center gap-3.5">
           {/* Icon tile — matches the marketplace card treatment so
@@ -782,10 +782,10 @@ function Header({
             {selected.icon}
           </div>
           <div className="min-w-0">
-            <h1 className="truncate font-serif text-lg font-semibold leading-tight text-ink-900">
+            <h1 className="truncate font-serif text-lg font-semibold leading-tight text-foreground">
               {selected.name}
             </h1>
-            <p className="truncate text-xs leading-snug text-ink-500">
+            <p className="truncate text-xs leading-snug text-muted-foreground">
               {selected.description}
             </p>
           </div>
@@ -793,19 +793,19 @@ function Header({
         {lockedToAgent ? (
           <a
             href={`${BASE_PATH}/`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 transition-all hover:border-brand-300 hover:text-brand-600 hover:shadow-sm"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground/85 transition-all hover:border-brand-300 hover:text-brand-600 hover:shadow-sm"
           >
             <span aria-hidden>←</span>
             <span>All agents</span>
           </a>
         ) : (
           <label className="flex shrink-0 items-center gap-2 text-sm">
-            <span className="hidden text-ink-500 sm:inline">Agent:</span>
+            <span className="hidden text-muted-foreground sm:inline">Agent:</span>
             <select
               value={selected.slug}
               onChange={(e) => onSelect(e.target.value)}
               disabled={disabled}
-              className="rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {agents.map((a) => (
                 <option key={a.slug} value={a.slug}>
@@ -887,7 +887,7 @@ function UserMessageView({ message }: { message: UserMessage }) {
           </div>
         )}
       </div>
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-200 text-sm font-medium text-ink-700 ring-2 ring-white">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground/85 ring-2 ring-white">
         you
       </div>
     </div>
@@ -931,12 +931,12 @@ function GreetingView({ agent }: { agent: PublicAgentConfig }) {
   }
 
   return (
-    <div className="rounded-2xl rounded-tl-md border border-cream-200/60 bg-white px-5 py-4 shadow-brand-card">
-      <p className="text-sm leading-relaxed text-ink-900">
+    <div className="rounded-2xl rounded-tl-md border border-border/60 bg-card px-5 py-4 shadow-brand-card">
+      <p className="text-sm leading-relaxed text-foreground">
         Hi — I&apos;m the{' '}
         <strong className="font-semibold">{agent.name}</strong>. {agent.description}
       </p>
-      <p className="mt-2.5 text-sm leading-relaxed text-ink-700">{actionLine}</p>
+      <p className="mt-2.5 text-sm leading-relaxed text-foreground/85">{actionLine}</p>
     </div>
   );
 }
@@ -980,14 +980,14 @@ function ThinkingView({ startedAt }: { startedAt: number }) {
   const showLongRunningHint = elapsedSec > 90;
 
   return (
-    <div className="flex flex-col gap-1 rounded-2xl rounded-tl-md border border-cream-200/60 bg-white px-5 py-4 text-sm text-ink-700 shadow-brand-card">
+    <div className="flex flex-col gap-1 rounded-2xl rounded-tl-md border border-border/60 bg-card px-5 py-4 text-sm text-foreground/85 shadow-brand-card">
       <div className="flex items-center gap-3">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
         <span>{stages[idx]}</span>
-        <span className="ml-auto text-xs text-ink-300">{elapsedSec}s</span>
+        <span className="ml-auto text-xs text-muted-foreground/60">{elapsedSec}s</span>
       </div>
       {showLongRunningHint && (
-        <p className="ml-7 text-xs text-ink-500">
+        <p className="ml-7 text-xs text-muted-foreground">
           Discovery agents can take 3-8 minutes when verifying many
           prospects. Hang tight — we&apos;ll show the result here when
           ready.
@@ -1009,7 +1009,7 @@ function ResultView({
   const showGate = message.gated && !message.unlocked;
 
   return (
-    <div className="space-y-4 rounded-2xl rounded-tl-md border border-cream-200/60 bg-white px-5 py-4 shadow-brand-card">
+    <div className="space-y-4 rounded-2xl rounded-tl-md border border-border/60 bg-card px-5 py-4 shadow-brand-card">
       {message.turnTrace.length > 0 && (
         <AgentTurnTraceView trace={message.turnTrace} />
       )}
@@ -1095,7 +1095,7 @@ function Composer({
   };
 
   return (
-    <footer className="border-t border-cream-200 bg-cream-50">
+    <footer className="border-t border-border bg-background">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 py-3">
         {/* Per-slot file chips. We render one chip strip per slot so the
             visitor knows which file is going into which slot. */}
@@ -1115,14 +1115,14 @@ function Composer({
                   {slotFiles.map((f) => (
                     <span
                       key={f.name}
-                      className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs text-ink-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-0.5 text-xs text-foreground/85"
                     >
                       📎 {f.name}
                       <button
                         type="button"
                         onClick={() => onRemoveFile(slot.key, f.name)}
                         disabled={isProcessing}
-                        className="text-ink-300 hover:text-red-500 disabled:opacity-50"
+                        className="text-muted-foreground/60 hover:text-red-500 disabled:opacity-50"
                         aria-label={`Remove ${f.name}`}
                       >
                         ×
@@ -1158,7 +1158,7 @@ function Composer({
             disabled={isProcessing}
             placeholder={placeholder}
             rows={2}
-            className="min-h-[44px] flex-1 resize-none rounded-xl border border-cream-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-cream-100"
+            className="min-h-[44px] flex-1 resize-none rounded-xl border border-border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-background"
           />
 
           <button
@@ -1171,7 +1171,7 @@ function Composer({
           </button>
         </div>
 
-        <p className="text-center text-[11px] text-ink-300">
+        <p className="text-center text-[11px] text-muted-foreground/60">
           Drop files anywhere · Enter to send · Shift+Enter for newline
         </p>
       </div>
@@ -1203,7 +1203,7 @@ function SlotAttachButton({
         onClick={() => inputRef.current?.click()}
         disabled={disabled}
         title={`Accepted: ${slot.extensions.join(', ')} · max ${slot.maxSizeMB}MB`}
-        className="inline-flex items-center justify-center rounded-lg border border-cream-200 bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center justify-center rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground/85 hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         📎 {slot.label}
       </button>
@@ -1259,15 +1259,15 @@ function DynamicWizardTrigger({
   if (!slot) return null;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-brand-100 bg-white p-5 shadow-brand-card">
+    <div className="space-y-3 rounded-2xl border border-brand-100 bg-card p-5 shadow-brand-card">
       <div>
         <p className="text-xs font-medium uppercase tracking-wider text-brand-700">
           Step 1 of 3
         </p>
-        <h3 className="mt-1 font-serif text-lg font-semibold text-ink-900">
+        <h3 className="mt-1 font-serif text-lg font-semibold text-foreground">
           Upload the {slot.label.toLowerCase()} first
         </h3>
-        <p className="mt-1 text-sm text-ink-700">
+        <p className="mt-1 text-sm text-foreground/85">
           We&apos;ll read it and build a short set of screening questions
           tailored to this specific role. No preset MCQs — every option
           comes from the {slot.label.toLowerCase()} itself.
@@ -1375,17 +1375,17 @@ function TriggerFilePicker({
         }}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors ${
           disabled
-            ? 'cursor-not-allowed border-cream-200 bg-cream-50 opacity-60'
+            ? 'cursor-not-allowed border-border bg-background opacity-60'
             : dragOver
               ? 'border-brand-500 bg-brand-50'
               : files.length > 0
                 ? 'border-brand-200 bg-brand-50/30'
-                : 'border-cream-300 bg-cream-50 hover:border-brand-300'
+                : 'border-border bg-background hover:border-brand-300'
         }`}
       >
         {files.length > 0 ? (
           <div className="flex w-full items-center justify-between gap-3 text-sm">
-            <span className="truncate text-ink-900">📄 {files[0].name}</span>
+            <span className="truncate text-foreground">📄 {files[0].name}</span>
             <button
               type="button"
               onClick={(e) => {
@@ -1393,7 +1393,7 @@ function TriggerFilePicker({
                 onRemoveFile(files[0].name);
               }}
               disabled={disabled}
-              className="rounded px-2 py-0.5 text-xs text-ink-500 hover:bg-cream-200 hover:text-ink-900"
+              className="rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Remove file"
             >
               Replace ×
@@ -1401,10 +1401,10 @@ function TriggerFilePicker({
           </div>
         ) : (
           <>
-            <p className="text-sm font-medium text-ink-900">
+            <p className="text-sm font-medium text-foreground">
               Drop a file here or click to browse
             </p>
-            <p className="mt-1 text-xs text-ink-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               {slot.extensions.join(' · ')} · up to {slot.maxSizeMB}MB
             </p>
           </>

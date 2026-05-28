@@ -115,16 +115,16 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
   }, [q, draft, picked, otherText]);
 
   return (
-    <div className="rounded-2xl border border-cream-200/60 bg-white p-6 shadow-brand-card">
+    <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-brand-card">
       {/* Progress bar — slightly taller + softer base */}
       <div className="mb-5">
         <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium uppercase tracking-wider">
           <span className="text-brand-700">{title}</span>
-          <span className="text-ink-500">
+          <span className="text-muted-foreground">
             {idx + 1} of {total}
           </span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-cream-200">
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-brand-gradient shadow-[0_0_8px_rgba(234,99,71,0.4)] transition-all duration-500 ease-out"
             style={{ width: `${progress}%` }}
@@ -132,11 +132,11 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
         </div>
       </div>
 
-      <h3 className="font-serif text-xl font-semibold leading-tight text-ink-900">
+      <h3 className="font-serif text-xl font-semibold leading-tight text-foreground">
         {q.prompt}
       </h3>
       {q.helpText && (
-        <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{q.helpText}</p>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{q.helpText}</p>
       )}
 
       <div className="mt-4">
@@ -148,7 +148,7 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={q.placeholder}
-              className="w-full rounded-xl border border-cream-200 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           ) : (
             <input
@@ -157,7 +157,7 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={q.placeholder}
-              className="w-full rounded-xl border border-cream-200 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           ))}
 
@@ -168,8 +168,8 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
                 key={opt}
                 className={`group flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5 text-sm transition-all duration-200 ${
                   draft === opt
-                    ? 'border-brand-500 bg-brand-50 text-ink-900 shadow-sm'
-                    : 'border-cream-200 bg-white text-ink-700 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-cream-50 hover:shadow-sm'
+                    ? 'border-brand-500 bg-brand-50 text-foreground shadow-sm'
+                    : 'border-border bg-card text-foreground/85 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-background hover:shadow-sm'
                 }`}
               >
                 <input
@@ -192,7 +192,7 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
                   if (e.target.value) setDraft('');
                 }}
                 placeholder="Other (type your own)"
-                className="mt-1 w-full rounded-xl border border-cream-200 bg-cream-50 px-4 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               />
             )}
           </div>
@@ -216,7 +216,7 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
                     className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                       active
                         ? 'border-brand-500 bg-brand-gradient text-white shadow-brand-cta'
-                        : 'border-cream-200 bg-white text-ink-700 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-cream-50 hover:shadow-sm'
+                        : 'border-border bg-card text-foreground/85 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-background hover:shadow-sm'
                     }`}
                   >
                     {active && <span className="mr-1">✓</span>}
@@ -231,19 +231,19 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
                 value={otherText}
                 onChange={(e) => setOtherText(e.target.value)}
                 placeholder="Add another (free text)"
-                className="mt-3 w-full rounded-xl border border-cream-200 bg-cream-50 px-4 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               />
             )}
           </>
         )}
       </div>
 
-      <div className="mt-6 flex items-center justify-between border-t border-cream-200 pt-4">
+      <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
         <button
           type="button"
           onClick={back}
           disabled={idx === 0}
-          className="text-sm font-medium text-ink-500 transition-colors hover:text-ink-900 disabled:opacity-30 disabled:hover:text-ink-500"
+          className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
         >
           ← Back
         </button>
@@ -252,7 +252,7 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
             <button
               type="button"
               onClick={() => next(true)}
-              className="text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               Skip
             </button>
@@ -261,7 +261,7 @@ export default function IcpWizard({ wizard, onComplete, onSkipWizard }: IcpWizar
             <button
               type="button"
               onClick={onSkipWizard}
-              className="text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
               title="Type a free-text ICP instead"
             >
               I&apos;d rather type freely →
