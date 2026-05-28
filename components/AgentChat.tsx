@@ -82,6 +82,7 @@ import { buildDynamicWizard } from '@/lib/wizard/dynamic';
 import { formatFileSize, getFileTypeMeta } from '@/lib/file-icons';
 import { gccProspectorWizard } from '@/lib/wizard/gcc-prospector';
 import { leadQualifierWizard } from '@/lib/wizard/lead-qualifier';
+import { outboundCampaignWizard } from '@/lib/wizard/outbound-campaign';
 import { salesProposalWizard } from '@/lib/wizard/sales-proposal';
 import { vendorEvaluatorWizard } from '@/lib/wizard/vendor-evaluator';
 import type { Question, WizardDefinition } from '@/lib/wizard/types';
@@ -105,6 +106,7 @@ const AGENT_WIZARDS: Record<string, WizardDefinition> = {
   'churn-risk': churnRiskWizard,
   'sales-proposal': salesProposalWizard,
   'ar-collections': arCollectionsWizard,
+  'outbound-campaign': outboundCampaignWizard,
 };
 
 // ---------------------------------------------------------------------------

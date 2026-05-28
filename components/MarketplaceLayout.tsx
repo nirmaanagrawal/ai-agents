@@ -179,6 +179,18 @@ const MARKETING: Record<string, AgentMarketingContent> = {
       'AR health score + concentration risks',
     ],
   },
+  'outbound-campaign': {
+    highlights: [
+      'Matches each persona to your strongest proof point from the brief',
+      'Drafts the full N-step sequence with A/B subject variants',
+      'Validates every step against your hard don\'ts',
+    ],
+    outputs: [
+      'Paste-ready sequence per persona',
+      'A/B subject variants + deliverability tips',
+      'Top angles + segments to deprioritize',
+    ],
+  },
 };
 
 const FALLBACK_MARKETING: AgentMarketingContent = { highlights: [], outputs: [] };
@@ -826,6 +838,7 @@ const AGENTS_WITH_PRESET_WIZARD = new Set([
   'churn-risk',
   'sales-proposal',
   'ar-collections',
+  'outbound-campaign',
 ]);
 const AGENTS_USING_WEB_TOOLS = new Set([
   'lead-qualifier',
@@ -836,6 +849,7 @@ const AGENTS_USING_WEB_TOOLS = new Set([
   'churn-risk',
   'sales-proposal',
   'ar-collections',
+  'outbound-campaign',
 ]);
 const LEVEL_4_AGENTS = new Set([
   'invoice-auditor',
@@ -843,4 +857,5 @@ const LEVEL_4_AGENTS = new Set([
   'churn-risk',
   'sales-proposal',
   'ar-collections',
+  'outbound-campaign',
 ]);

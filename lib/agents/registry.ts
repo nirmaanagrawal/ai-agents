@@ -9,6 +9,7 @@ import { churnRisk } from './churn-risk';
 import { gccProspector } from './gcc-prospector';
 import { invoiceAuditor } from './invoice-auditor';
 import { leadQualifier } from './lead-qualifier';
+import { outboundCampaign } from './outbound-campaign';
 import { resumeScreener } from './resume-screener';
 import { salesProposal } from './sales-proposal';
 import { vendorEvaluator } from './vendor-evaluator';
@@ -26,6 +27,7 @@ const agents: Record<string, AgentConfig<unknown>> = {
   [churnRisk.slug]: churnRisk as AgentConfig<unknown>,
   [salesProposal.slug]: salesProposal as AgentConfig<unknown>,
   [arCollections.slug]: arCollections as AgentConfig<unknown>,
+  [outboundCampaign.slug]: outboundCampaign as AgentConfig<unknown>,
 };
 
 export function getAgent(slug: string): AgentConfig<unknown> | undefined {
