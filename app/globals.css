@@ -99,7 +99,8 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-feature-settings: 'cv11', 'ss01', 'ss03'; /* Geist Sans niceties */
+    /* No font-feature-settings — the system stack handles its own
+       OpenType defaults per-OS, matching www.beanbag.ai's body. */
   }
 
   /* Subtle warm-grain texture on body — reads "premium editorial",

@@ -98,12 +98,39 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        // IBM Plex Serif — beanbag.ai identity, used for headlines + agent titles
+        // IBM Plex Serif — beanbag.ai's headline typeface. Loaded via
+        // next/font in app/layout.tsx; the CSS variable falls through
+        // to the same fallback chain the parent site uses.
         serif: ['var(--font-serif)', '"IBM Plex Serif"', 'Georgia', 'serif'],
-        // Geist Sans — product UI body type, optimized for dense interface text
-        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
-        // Geist Mono — code, hashes, monospace data
-        mono: ['var(--font-mono)', 'ui-monospace', 'Menlo', 'Monaco', 'monospace'],
+        // System stack — copied verbatim from beanbag.ai's `body`
+        // selector. We deliberately do NOT load a custom UI font (no
+        // Geist/Inter) so the marketplace renders in the visitor's
+        // native OS type (San Francisco on Mac, Segoe UI on Windows,
+        // Roboto on Android), matching the parent site exactly.
+        sans: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          'Oxygen',
+          'Ubuntu',
+          'Cantarell',
+          '"Fira Sans"',
+          '"Droid Sans"',
+          '"Helvetica Neue"',
+          'sans-serif',
+        ],
+        // Monospace — system stack, no Geist Mono dependency.
+        mono: [
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'Monaco',
+          'Consolas',
+          '"Liberation Mono"',
+          '"Courier New"',
+          'monospace',
+        ],
       },
       backgroundImage: {
         // Reusable brand gradient for buttons, accents, hero strips

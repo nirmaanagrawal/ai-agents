@@ -1,12 +1,13 @@
 /**
  * Root layout — fonts, theme provider, global toaster, footer.
  *
- * Typography pairing:
- *   - Geist Sans (body)   — Vercel's product font. Dense, neutral,
- *                            tuned for UI labels and data.
- *   - Geist Mono          — code, hashes, monospace values.
- *   - IBM Plex Serif      — headlines + agent titles. Anchors the
- *                            Beanbag brand identity.
+ * Typography pairing (matches www.beanbag.ai exactly):
+ *   - IBM Plex Serif    — headlines + agent titles. Anchors brand identity.
+ *   - System UI stack   — body. Renders native to the visitor's OS
+ *                          (San Francisco on Mac, Segoe UI on Windows,
+ *                          Roboto on Android) so the marketplace reads
+ *                          like part of the parent site, not a hosted
+ *                          SaaS dashboard. No custom UI font loaded.
  *
  * `next-themes` provides class-based dark mode (`<html class="dark">`).
  * `suppressHydrationWarning` on <html> is required by next-themes to
@@ -15,8 +16,6 @@
  * Sonner Toaster is mounted globally so any component can call
  * `toast.success(...)` / `toast.error(...)` without re-mounting.
  */
-import { GeistMono } from 'geist/font/mono';
-import { GeistSans } from 'geist/font/sans';
 import type { Metadata } from 'next';
 import { IBM_Plex_Serif } from 'next/font/google';
 import { Toaster } from 'sonner';
@@ -47,7 +46,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${GeistSans.variable} ${GeistMono.variable} ${plexSerif.variable}`}
+      className={plexSerif.variable}
     >
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
