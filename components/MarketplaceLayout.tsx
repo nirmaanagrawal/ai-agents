@@ -152,6 +152,18 @@ const MARKETING: Record<string, AgentMarketingContent> = {
       'Win-probability call + follow-up gaps',
     ],
   },
+  'ar-collections': {
+    highlights: [
+      'Triages every overdue invoice against your playbook',
+      'Drafts paste-ready dunning emails in matching tone per invoice',
+      'Surfaces concentration risks + flags strategic accounts to soft-touch',
+    ],
+    outputs: [
+      'Ranked overdue list with confidence',
+      'Per-invoice action + dunning email',
+      'AR health score + concentration risks',
+    ],
+  },
 };
 
 const FALLBACK_MARKETING: AgentMarketingContent = {
@@ -699,6 +711,7 @@ const AGENTS_WITH_PRESET_WIZARD = new Set([
   'vendor-evaluator',
   'churn-risk',
   'sales-proposal',
+  'ar-collections',
 ]);
 const AGENTS_USING_WEB_TOOLS = new Set([
   'lead-qualifier',
@@ -708,10 +721,12 @@ const AGENTS_USING_WEB_TOOLS = new Set([
   'resume-screener',
   'churn-risk',
   'sales-proposal',
+  'ar-collections',
 ]);
 const LEVEL_4_AGENTS = new Set([
   'invoice-auditor',
   'gcc-prospector',
   'churn-risk',
   'sales-proposal',
+  'ar-collections',
 ]);

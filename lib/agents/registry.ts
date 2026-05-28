@@ -4,6 +4,7 @@
  * Adding an agent = create a new file under lib/agents/ and register it here.
  * Nothing else needs to change — routes and UI are generic over the registry.
  */
+import { arCollections } from './ar-collections';
 import { churnRisk } from './churn-risk';
 import { gccProspector } from './gcc-prospector';
 import { invoiceAuditor } from './invoice-auditor';
@@ -24,6 +25,7 @@ const agents: Record<string, AgentConfig<unknown>> = {
   [resumeScreener.slug]: resumeScreener as AgentConfig<unknown>,
   [churnRisk.slug]: churnRisk as AgentConfig<unknown>,
   [salesProposal.slug]: salesProposal as AgentConfig<unknown>,
+  [arCollections.slug]: arCollections as AgentConfig<unknown>,
 };
 
 export function getAgent(slug: string): AgentConfig<unknown> | undefined {

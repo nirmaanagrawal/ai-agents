@@ -39,6 +39,8 @@ export function ResultsBody({
       return <AccountsView result={result} />;
     case 'sales-proposal':
       return <ProposalView result={result} />;
+    case 'ar-collections':
+      return <ReceivablesView result={result} />;
     default:
       return <GenericJsonView result={result} />;
   }
@@ -1986,6 +1988,323 @@ function ProposalView({ result }: { result: Record<string, unknown> }) {
           </p>
           <p className="text-sm italic text-ink-700">{selfReview}</p>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AR Collections Agent
+// ---------------------------------------------------------------------------
+
+function ReceivablesView({ result }: { result: Record<string, unknown> }) {
+  const raw = result.invoices;
+  const invoices: Array<Record<string, unknown>> = Array.isArray(raw)
+    ? (raw as Array<Record<string, unknown>>)
+    : [];
+  const total = numberOrUndef(result.totalInvoices) ?? invoices.length;
+  const openAR = numberOrUndef(result.totalOpenAR);
+  const overdueAR = numberOrUndef(result.totalOverdueAR);
+  const health = numberOrUndef(result.arHealthScore);
+  const currency = stringOr(result.currency, 'USD');
+  const summary = stringOr(result.executiveSummary, '');
+  const plan = stringOr(result.agentPlan, '');
+  const selfReview = stringOr(result.selfReviewNotes, '');
+
+  const risks = Array.isArray(result.topCollectionRisks)
+    ? (result.topCollectionRisks as unknown[]).filter(
+        (s): s is string => typeof s === 'string',
+      )
+    : [];
+  const buckets = Array.isArray(result.bucketBreakdown)
+    ? (result.bucketBreakdown as Array<Record<string, unknown>>).filter(
+        (b): b is Record<string, unknown> => b && typeof b === 'object',
+      )
+    : [];
+  const actions = Array.isArray(result.actionDistribution)
+    ? (result.actionDistribution as Array<Record<string, unknown>>).filter(
+        (a): a is Record<string, unknown> => a && typeof a === 'object',
+      )
+    : [];
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h3 className="font-serif text-lg font-semibold text-ink-900">
+          Triaged {total} invoice{total === 1 ? '' : 's'}
+          {overdueAR !== undefined && overdueAR > 0 && (
+            <span className="ml-2 text-sm font-normal text-red-700">
+              · {currency} {formatNumberCompact(overdueAR)} overdue
+            </span>
+          )}
+        </h3>
+        {summary && <p className="mt-1 text-sm text-ink-700">{summary}</p>}
+      </div>
+
+      {plan && (
+        <div className="rounded-lg border border-brand-100 bg-brand-gradient-soft p-3 text-sm text-ink-900">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-brand-700">
+            🤖 Agent plan
+          </p>
+          <p className="leading-relaxed">{plan}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2 text-xs font-medium">
+        {health !== undefined && (
+          <div className="rounded bg-brand-gradient px-3 py-2 text-white">
+            <div className="text-lg font-bold">{health}</div>
+            <div>AR health</div>
+          </div>
+        )}
+        {openAR !== undefined && (
+          <div className="rounded bg-cream-50 px-3 py-2 text-ink-900">
+            <div className="text-lg font-bold">
+              {currency} {formatNumberCompact(openAR)}
+            </div>
+            <div className="text-ink-700">Total open AR</div>
+          </div>
+        )}
+        {overdueAR !== undefined && (
+          <div className="rounded bg-red-50 px-3 py-2 text-red-700">
+            <div className="text-lg font-bold">
+              {currency} {formatNumberCompact(overdueAR)}
+            </div>
+            <div>Overdue AR</div>
+          </div>
+        )}
+      </div>
+
+      {buckets.length > 0 && (
+        <div className="rounded-lg border border-cream-200 bg-white p-3">
+          <p className="mb-2 text-sm font-semibold text-ink-900">📊 Aging breakdown</p>
+          <ul className="space-y-1 text-sm text-ink-700">
+            {buckets.map((b, i) => {
+              const label = stringOr(b.bucket, '');
+              const count = numberOrUndef(b.invoiceCount) ?? 0;
+              const amt = numberOrUndef(b.totalAmount) ?? 0;
+              return (
+                <li key={i} className="flex items-baseline justify-between gap-3">
+                  <span>{label}</span>
+                  <span className="text-ink-900">
+                    {count} {count === 1 ? 'invoice' : 'invoices'}
+                    <span className="ml-2 font-medium">
+                      {currency} {formatNumberCompact(amt)}
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {invoices.map((inv, i) => (
+          <ReceivableRow key={i} invoice={inv} fallbackCurrency={currency} />
+        ))}
+      </div>
+
+      {risks.length > 0 && (
+        <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+          <p className="mb-2 text-sm font-semibold text-brand-700">
+            🔭 Top collection risks
+          </p>
+          <ul className="space-y-1 text-sm text-ink-900">
+            {risks.map((s, i) => (
+              <li key={i}>• {s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {actions.length > 0 && (
+        <div className="rounded-lg border border-cream-200 bg-white p-3">
+          <p className="mb-2 text-sm font-semibold text-ink-900">
+            🛠 Action distribution
+          </p>
+          <ul className="space-y-1 text-sm text-ink-700">
+            {actions.map((a, i) => {
+              const action = stringOr(a.action, '');
+              const count = numberOrUndef(a.invoiceCount) ?? 0;
+              const amt = numberOrUndef(a.totalAmount) ?? 0;
+              return (
+                <li key={i} className="flex items-baseline justify-between gap-3">
+                  <span>{action}</span>
+                  <span className="font-medium text-ink-900">
+                    {count} · {currency} {formatNumberCompact(amt)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {selfReview && (
+        <div className="rounded-lg border border-cream-200 bg-white p-3">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-500">
+            🪞 Agent self-review
+          </p>
+          <p className="text-sm italic text-ink-700">{selfReview}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReceivableRow({
+  invoice,
+  fallbackCurrency,
+}: {
+  invoice: Record<string, unknown>;
+  fallbackCurrency: string;
+}) {
+  const id = stringOr(invoice.invoiceId, '—');
+  const customer = stringOr(invoice.customer, '—');
+  const amount = numberOrUndef(invoice.amount) ?? 0;
+  const currency = stringOr(invoice.currency, fallbackCurrency);
+  const dueDate = stringOr(invoice.dueDate, '');
+  const daysPastDue = numberOrUndef(invoice.daysPastDue) ?? 0;
+  const bucketLabel = stringOr(invoice.bucketLabel, '');
+  const grade = stringOr(invoice.grade, 'WATCH');
+  const score = numberOrUndef(invoice.riskScore) ?? 0;
+  const confidence = numberOrUndef(invoice.confidence);
+  const isStrategic = Boolean(invoice.isStrategic);
+  const isEscalation = Boolean(invoice.isEscalation);
+  const action = stringOr(invoice.recommendedAction, '');
+  const email = stringOr(invoice.dunningEmail, '');
+  const escalateTo = stringOr(invoice.escalateTo, '');
+  const reasoning = stringOr(invoice.reasoning, '');
+  const termsDeviation = stringOr(invoice.paymentTermsDeviation, '');
+
+  const followUps = Array.isArray(invoice.followUpQuestions)
+    ? (invoice.followUpQuestions as unknown[]).filter(
+        (s): s is string => typeof s === 'string',
+      )
+    : [];
+
+  const gradeClasses =
+    grade === 'WRITE_OFF'
+      ? 'bg-ink-200 text-ink-900'
+      : grade === 'CRITICAL'
+        ? 'bg-red-100 text-red-700'
+        : grade === 'OVERDUE'
+          ? 'bg-orange-100 text-orange-800'
+          : grade === 'WATCH'
+            ? 'bg-amber-100 text-amber-800'
+            : 'bg-emerald-100 text-emerald-700';
+
+  const gradeLabel =
+    grade === 'WRITE_OFF'
+      ? 'WRITE OFF'
+      : grade === 'CRITICAL'
+        ? 'CRITICAL'
+        : grade === 'OVERDUE'
+          ? 'OVERDUE'
+          : grade === 'WATCH'
+            ? 'WATCH'
+            : 'HEALTHY';
+
+  const confidenceClasses =
+    confidence === undefined
+      ? 'text-ink-500'
+      : confidence >= 85
+        ? 'text-emerald-700'
+        : confidence >= 70
+          ? 'text-amber-700'
+          : 'text-red-700';
+
+  return (
+    <div className="rounded-lg border bg-white p-3 transition-shadow hover:shadow-brand-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 font-medium text-ink-900">
+            <span className="truncate">{customer}</span>
+            <span className="text-xs font-normal text-ink-500">#{id}</span>
+            {isStrategic && (
+              <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
+                strategic
+              </span>
+            )}
+            {isEscalation && (
+              <span className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                escalation
+              </span>
+            )}
+          </p>
+          <p className="mt-0.5 text-sm text-ink-700">
+            {[
+              `${currency} ${formatNumberCompact(amount)}`,
+              dueDate && `due ${dueDate}`,
+              daysPastDue > 0
+                ? `${daysPastDue}d past due`
+                : daysPastDue === 0
+                  ? 'due today'
+                  : `${-daysPastDue}d until due`,
+              bucketLabel && `bucket: ${bucketLabel}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span
+            className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${gradeClasses}`}
+          >
+            {gradeLabel} · {score}/100
+          </span>
+          {confidence !== undefined && (
+            <span
+              className={`text-[11px] font-medium ${confidenceClasses}`}
+              title="How thoroughly the agent verified this call. <70 = data was thin; AR clerk should sanity-check."
+            >
+              {confidence}% confidence
+            </span>
+          )}
+        </div>
+      </div>
+
+      {reasoning && <p className="mt-2 text-sm text-ink-700">{reasoning}</p>}
+
+      {termsDeviation && (
+        <p className="mt-1.5 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+          ⚠ Terms note — {termsDeviation}
+        </p>
+      )}
+
+      {action && (
+        <div className="mt-2 rounded border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs">
+          <span className="font-medium text-brand-700">🛠 Recommended action:</span>{' '}
+          <span className="text-ink-900">{action}</span>
+          {escalateTo && (
+            <span className="ml-2 text-ink-500">→ escalate to {escalateTo}</span>
+          )}
+        </div>
+      )}
+
+      {email && (
+        <details className="mt-2 rounded border border-brand-100 bg-brand-50/40 px-2.5 py-1.5 text-xs">
+          <summary className="cursor-pointer font-medium text-brand-700">
+            ✉ Draft dunning email — paste-ready
+          </summary>
+          <pre className="mt-1.5 whitespace-pre-wrap font-sans text-xs text-ink-700">
+            {email}
+          </pre>
+        </details>
+      )}
+
+      {followUps.length > 0 && (
+        <details className="mt-2 group">
+          <summary className="cursor-pointer text-xs font-medium text-ink-700 hover:text-brand-600">
+            Questions if customer responds ({followUps.length})
+          </summary>
+          <ol className="mt-1.5 ml-4 list-decimal space-y-1 text-xs text-ink-700">
+            {followUps.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ol>
+        </details>
       )}
     </div>
   );

@@ -58,6 +58,7 @@ import {
   AgentTurnTraceView,
 } from './agent-renderers';
 import IcpWizard from './IcpWizard';
+import { arCollectionsWizard } from '@/lib/wizard/ar-collections';
 import { churnRiskWizard } from '@/lib/wizard/churn-risk';
 import { buildDynamicWizard } from '@/lib/wizard/dynamic';
 import { gccProspectorWizard } from '@/lib/wizard/gcc-prospector';
@@ -83,6 +84,7 @@ const AGENT_WIZARDS: Record<string, WizardDefinition> = {
   'vendor-evaluator': vendorEvaluatorWizard,
   'churn-risk': churnRiskWizard,
   'sales-proposal': salesProposalWizard,
+  'ar-collections': arCollectionsWizard,
 };
 
 // ---------------------------------------------------------------------------
